@@ -35,7 +35,7 @@ La structure du projet est organisée comme suit :
 
 ```bash
 # Clonez le dépôt
-git clone https://github.com/VOTRE_USERNAME/log430-lab0.git
+git clone https://github.com/MelvinSDRS/log430-lab0.git
 
 # Accédez au répertoire du projet
 cd log430-lab0
