@@ -4,9 +4,46 @@
 
 Une application simple qui affiche "Hello World" dans la console.
 
+## Architecture et structure du projet
+
+Ce projet est construit selon une architecture simple avec les composants suivants :
+
+- **Application principale** : Un script Python minimaliste qui affiche "Hello World"
+- **Tests unitaires** : Tests pour valider le comportement de l'application
+- **Conteneurisation** : Docker pour l'isolation et la portabilité 
+- **Orchestration** : Docker Compose pour la gestion des conteneurs
+- **CI/CD** : Pipeline d'intégration et déploiement continu via GitHub Actions
+
+La structure du projet est organisée comme suit :
+
+```
+.
+├── app.py                   # Application principale
+├── test_app.py              # Tests unitaires
+├── Dockerfile               # Instructions pour la création de l'image Docker
+├── .dockerignore            # Fichiers à exclure lors de la construction de l'image
+├── docker-compose.yml       # Configuration pour l'orchestration avec Docker Compose
+├── .github/workflows/       # Configuration de la pipeline CI/CD
+│   └── ci-cd.yml            # Définition de la pipeline
+│   └── README.md            # Documentation de la pipeline
+└── README.md                # Documentation du projet
+```
+
+## Guide de démarrage
+
+### Cloner le projet
+
+```bash
+# Clonez le dépôt
+git clone https://github.com/VOTRE_USERNAME/log430-lab0.git
+
+# Accédez au répertoire du projet
+cd log430-lab0
+```
+
 ### Exécution
 
-Pour exécuter l'application:
+Pour exécuter l'application localement:
 
 ```bash
 python3 app.py
@@ -44,7 +81,7 @@ docker run --rm hello-world-app pytest -v
 
 L'application est orchestrée avec Docker Compose pour faciliter son lancement.
 
-Pour lancer l'application:
+Pour construire et lancer l'application:
 
 ```bash
 docker compose up --build
@@ -56,7 +93,7 @@ Pour exécuter les tests:
 docker compose --profile test up --build
 ```
 
-### Intégration Continue (CI/CD)
+## Intégration Continue (CI/CD)
 
 Ce projet est configuré avec une pipeline CI/CD qui s'exécute automatiquement à chaque push ou pull request.
 
@@ -69,11 +106,6 @@ La pipeline comprend les étapes suivantes:
 
 Consultez le répertoire `.github/workflows` pour plus de détails sur la configuration.
 
-### Structure du projet
+### Exécution réussie de la pipeline CI/CD
 
-- `app.py` : Programme principal qui affiche le message
-- `test_app.py` : Tests unitaires pour l'application
-- `Dockerfile` : Instructions pour la création de l'image Docker
-- `.dockerignore` : Fichiers à exclure lors de la construction de l'image
-- `docker-compose.yml` : Configuration pour l'orchestration avec Docker Compose
-- `.github/workflows/ci-cd.yml` : Configuration de la pipeline CI/CD
+![Capture d'écran de la pipeline CI/CD](https://github.com/user-attachments/assets/f60d2607-1c55-4c17-83a4-0c92bf87bcc6)
