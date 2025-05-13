@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hello-world-app
+    tty: true
+    command: python3 app.py
+    volumes:
+      - ./app.py:/app/app.py
+      - ./test_app.py:/app/test_app.py
+    init: true
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hello-world-test
+    command: pytest -v
+    volumes:
+      - ./app.py:/app/app.py
+      - ./test_app.py:/app/test_app.py
+    profiles:
+      - test 
