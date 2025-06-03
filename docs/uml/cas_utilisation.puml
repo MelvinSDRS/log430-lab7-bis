@@ -1,0 +1,10 @@
+@startuml
+left to right direction
+actor Caissier
+rectangle "Système POS" {
+  Caissier -- (Rechercher un produit)
+  Caissier -- (Enregistrer une vente)
+  Caissier -- (Gérer les retours)
+  Caissier -- (Consulter le stock)
+}
+@enduml

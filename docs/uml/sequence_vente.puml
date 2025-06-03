@@ -1,0 +1,20 @@
+@startuml
+actor Caissier
+participant "CLI" as UI
+participant "ServiceVente" as Service
+participant "RepositoryProduit" as RepoProduit
+participant "RepositoryVente" as RepoVente
+participant "BD PostgreSQL" as BD
+
+Caissier -> UI: creerVente()
+UI -> Service: creerVente(panier)
+activate Service
+Service -> RepoProduit: mettre_a_jour_stock()
+RepoProduit -> BD: UPDATE stock
+RepoProduit <-- BD
+Service -> RepoVente: sauvegarder(vente)
+RepoVente -> BD: INSERT vente, lignes_vente
+BD --> RepoVente
+Service --> UI: idVente
+deactivate Service
+@enduml

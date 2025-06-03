@@ -1,0 +1,9 @@
+@startuml
+package "Application POS" {
+  [CLI] --> [Couche Domaine]
+  [Couche Domaine] --> [Services Applicatifs]
+  [Services Applicatifs] --> [Adaptateur Persistance]
+  [Adaptateur Persistance] --> [BD PostgreSQL]
+}
+database "BD PostgreSQL" as db
+@enduml

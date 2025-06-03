@@ -1,111 +1,112 @@
-# LOG430 - Lab 0
+# LOG430 - Lab 1 - Système de Point de Vente
 
-## Application Python "Hello World"
+## Description
 
-Une application simple qui affiche "Hello World" dans la console.
+Système de point de vente (POS) pour un petit magasin de quartier avec **architecture client/serveur 2-tier**. L'application permet de gérer les opérations de base d'un système de caisse avec support pour 3 caisses simultanées.
 
-## Architecture et structure du projet
+## Architecture
 
-Ce projet est construit selon une architecture simple avec les composants suivants :
+- **Serveur (Tier 1)** : Base de données PostgreSQL dans un conteneur dédié
+- **Clients (Tier 2)** : 3 applications console indépendantes qui se connectent au serveur
 
-- **Application principale** : Un script Python minimaliste qui affiche "Hello World"
-- **Tests unitaires** : Tests pour valider le comportement de l'application
-- **Conteneurisation** : Docker pour l'isolation et la portabilité 
-- **Orchestration** : Docker Compose pour la gestion des conteneurs
-- **CI/CD** : Pipeline d'intégration et déploiement continu via GitHub Actions
+## Fonctionnalités
 
-La structure du projet est organisée comme suit :
+- Rechercher un produit (par identifiant, nom ou catégorie)
+- Enregistrer une vente (sélection de produits et calcul du total)
+- Gérer les retours (annuler une vente)
+- Consulter l'état du stock des produits
+- Gestion des transactions pour garantir la cohérence des données
+
+## Démarrage Rapide
+
+### Prérequis
+- Docker Engine 20.10+
+- Docker Compose v2.0+
+
+### Lancement (Une seule commande)
+
+```bash
+# Démarrer l'architecture complète (serveur + 3 clients)
+docker compose up -d
+
+# Accéder aux clients
+docker compose exec pos-app-1 python main.py  # Client 1
+docker compose exec pos-app-2 python main.py  # Client 2  
+docker compose exec pos-app-3 python main.py  # Client 3
+```
+
+### Workflow Automatique
+
+Le système démarre **complètement automatiquement** :
+1. PostgreSQL démarre et devient healthy (~11 secondes)
+2. Base de données initialisée automatiquement (8 produits, 3 caisses, 3 caissiers)
+3. 3 clients démarrent et attendent la sélection de caisse
+4. **Aucune intervention manuelle** requise
+
+## Utilisation
+
+### Configuration Multi-Caisses
+
+Au démarrage, chaque client permet de :
+1. **Sélectionner votre caisse** (parmi 3 caisses disponibles)
+2. **Choisir votre identité de caissier** (Alice, Bob, ou Claire)
+
+### Interface
+
+L'application présente un menu avec les options suivantes :
+1. **Rechercher un produit** : Recherche par ID, nom ou catégorie
+2. **Ajouter au panier** : Ajouter des produits au panier courant
+3. **Voir le panier** : Afficher le contenu du panier avec le total
+4. **Finaliser la vente** : Traiter la vente et mettre à jour les stocks
+5. **Retourner une vente** : Annuler une vente existante
+6. **Quitter** : Fermer l'application
+
+## Tests
+
+```bash
+# Exécuter tous les tests (10 tests : 7 unitaires + 3 performance)
+docker compose --profile test up pos-test
+```
+
+## Commandes Utiles
+
+```bash
+# Arrêter tous les services
+docker compose down
+
+# Arrêter et supprimer les volumes (reset complet)
+docker compose down -v
+
+# Voir les logs
+docker compose logs -f
+
+# Vérifier l'état des conteneurs
+docker compose ps
+```
+
+## Technologies
+
+- **Python 3.11** : Langage de programmation
+- **PostgreSQL** : Base de données serveur
+- **SQLAlchemy** : ORM pour l'abstraction de la persistance
+- **Rich** : Interface console améliorée
+- **Docker** : Conteneurisation et déploiement
+
+## Structure du Projet
 
 ```
 .
-├── app.py                   # Application principale
-├── test_app.py              # Tests unitaires
-├── Dockerfile               # Instructions pour la création de l'image Docker
-├── .dockerignore            # Fichiers à exclure lors de la construction de l'image
-├── docker-compose.yml       # Configuration pour l'orchestration avec Docker Compose
-├── .github/workflows/       # Configuration de la pipeline CI/CD
-│   └── ci-cd.yml            # Définition de la pipeline
-│   └── README.md            # Documentation de la pipeline
-└── README.md                # Documentation du projet
+├── src/
+│   ├── client/           # Interface console
+│   ├── domain/           # Logique métier
+│   └── persistence/      # Accès aux données
+├── tests/                # Tests unitaires et performance
+├── docs/                 # Documentation complète
+├── main.py              # Point d'entrée
+├── init_data.py         # Initialisation des données
+└── docker-compose.yml   # Configuration Docker
 ```
 
-## Guide de démarrage
+## Documentation Complète
 
-### Cloner le projet
-
-```bash
-# Clonez le dépôt
-git clone https://github.com/MelvinSDRS/log430-lab0.git
-
-# Accédez au répertoire du projet
-cd log430-lab0
-```
-
-### Exécution
-
-Pour exécuter l'application localement:
-
-```bash
-python3 app.py
-```
-
-### Tests unitaires
-
-Les tests unitaires utilisent le framework pytest. Pour exécuter les tests:
-
-```bash
-pytest -v
-```
-
-### Docker
-
-L'application est conteneurisée avec Docker. Pour construire l'image:
-
-```bash
-docker build -t hello-world-app .
-```
-
-Pour exécuter l'application dans un conteneur:
-
-```bash
-docker run --rm hello-world-app
-```
-
-Pour exécuter les tests dans le conteneur:
-
-```bash
-docker run --rm hello-world-app pytest -v
-```
-
-### Docker Compose
-
-L'application est orchestrée avec Docker Compose pour faciliter son lancement.
-
-Pour construire et lancer l'application:
-
-```bash
-docker compose up --build
-```
-
-Pour exécuter les tests:
-
-```bash
-docker compose --profile test up --build
-```
-
-## Intégration Continue (CI/CD)
-
-Ce projet est configuré avec une pipeline CI/CD qui s'exécute automatiquement à chaque push ou pull request.
-
-La pipeline comprend les étapes suivantes:
-
-1. **Lint**: Analyse statique du code avec pylint
-2. **Tests**: Exécution des tests unitaires
-3. **Build**: Construction de l'image Docker
-4. **Publication**: Publication de l'image sur Docker Hub (pour les branches main/master)
-
-Consultez le répertoire `.github/workflows` pour plus de détails sur la configuration.
-
-### Exécution réussie de la pipeline CI/CD
-
-![Capture d'écran de la pipeline CI/CD](https://github.com/user-attachments/assets/f60d2607-1c55-4c17-83a4-0c92bf87bcc6)
+La documentation détaillée incluant les diagrammes UML et les décisions d'architecture est disponible dans le dossier `docs/`.

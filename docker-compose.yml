@@ -1,26 +1,130 @@
-version: '3.8'
-
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: hello-world-app
-    tty: true
-    command: python3 app.py
+  # PostgreSQL Database Server (Serveur)
+  postgres:
+    image: postgres:15-alpine
+    container_name: pos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pos_system
+      POSTGRES_USER: pos_user
+      POSTGRES_PASSWORD: pos_password
     volumes:
-      - ./app.py:/app/app.py
-      - ./test_app.py:/app/test_app.py
-    init: true
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pos_user -d pos_system"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  test:
+  # Database initialization service
+  init-data-auto:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hello-world-test
-    command: pytest -v
-    volumes:
-      - ./app.py:/app/app.py
-      - ./test_app.py:/app/test_app.py
+      target: production
+    container_name: pos-init-data-auto
+    command: python init_data.py
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_system
+      - PYTHONPATH=/app
+    networks:
+      - pos-network
+    restart: "no"
+
+  # POS Application Client 1 (Client)
+  pos-app-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: pos-client-1
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-data-auto:
+        condition: service_completed_successfully
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_system
+      - PYTHONPATH=/app
+    stdin_open: true
+    tty: true
+    networks:
+      - pos-network
+
+  # POS Application Client 2 (Client)
+  pos-app-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: pos-client-2
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-data-auto:
+        condition: service_completed_successfully
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_system
+      - PYTHONPATH=/app
+    stdin_open: true
+    tty: true
+    networks:
+      - pos-network
+
+  # POS Application Client 3 (Client)
+  pos-app-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: pos-client-3
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-data-auto:
+        condition: service_completed_successfully
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_system
+      - PYTHONPATH=/app
+    stdin_open: true
+    tty: true
+    networks:
+      - pos-network
+
+  # Test service
+  pos-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: pos-test
+    command: sh -c "python init_data.py && pytest tests/ -v"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_system
+      - PYTHONPATH=/app
+    user: "root"
     profiles:
-      - test 
+      - test
+    networks:
+      - pos-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  pos-network:
+    driver: bridge 

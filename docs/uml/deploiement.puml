@@ -1,0 +1,30 @@
+@startuml
+title Architecture Client/Serveur 2-Tier - Système POS
+
+node "Serveur PostgreSQL" {
+  database "pos-postgres\n:5432" as DB
+}
+
+node "Client 1" {
+  component "pos-client-1" as App1
+}
+
+node "Client 2" {
+  component "pos-client-2" as App2
+}
+
+node "Client 3" {
+  component "pos-client-3" as App3
+}
+
+App1 --> DB : SQL
+App2 --> DB : SQL
+App3 --> DB : SQL
+
+note bottom
+  Architecture 2-Tier:
+  • Tier 1: Base de données PostgreSQL
+  • Tier 2: 3 Applications console
+end note
+
+@enduml

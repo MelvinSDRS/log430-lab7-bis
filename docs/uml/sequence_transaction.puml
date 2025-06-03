@@ -1,0 +1,48 @@
+@startuml
+participant "ServiceVente" as SV
+participant "ServiceTransaction" as ST
+participant "ServiceInventaire" as SI
+participant "RepositoryVente" as RV
+participant "RepositoryProduit" as RP
+participant "BD PostgreSQL" as BD
+
+-> SV: effectuerVente(panier)
+activate SV
+
+SV -> ST: commencer()
+activate ST
+ST -> BD: BEGIN TRANSACTION
+ST --> SV: transactionId
+
+SV -> SI: verifierDisponibilité(panier)
+SI -> RP: obtenirStock(produitIds)
+RP -> BD: SELECT ... WHERE id IN ...
+BD --> RP: stocks
+RP --> SI: disponibilités
+SI --> SV: résultatVérification
+
+alt stock suffisant
+    SV -> SI: réserverStock(panier)
+    SI -> BD: UPDATE produits SET quantite = ...
+    BD --> SI: ok
+    
+    SV -> RV: enregistrerVente(vente)
+    RV -> BD: INSERT INTO ventes ...
+    BD --> RV: ok
+    
+    SV -> ST: valider()
+    ST -> BD: COMMIT
+    ST --> SV: confirmationTransaction
+    
+    SV --> : venteComplétée
+else stock insuffisant
+    SV -> ST: annuler()
+    ST -> BD: ROLLBACK
+    ST --> SV: transactionAnnulée
+    
+    SV --> : venteImpossible(produits_manquants)
+end
+
+deactivate SV
+deactivate ST
+@enduml 

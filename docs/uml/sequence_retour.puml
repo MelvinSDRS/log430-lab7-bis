@@ -1,0 +1,23 @@
+@startuml
+actor Caissier
+participant UI
+participant ServiceVente
+participant RepositoryProduit
+participant RepositoryVente
+participant "BD PostgreSQL" as BD
+
+Caissier -> UI: retournerVente(idVente)
+UI -> ServiceVente: retourner_vente()
+activate ServiceVente
+ServiceVente -> RepositoryVente: obtenir_par_id(idVente)
+RepositoryVente -> BD: SELECT vente
+BD --> RepositoryVente
+ServiceVente -> RepositoryProduit: mettre_a_jour_stock()
+RepositoryProduit -> BD: UPDATE stock
+BD --> RepositoryProduit
+ServiceVente -> RepositoryVente: marquer_comme_retournee()
+RepositoryVente -> BD: UPDATE statut
+BD --> RepositoryVente
+ServiceVente --> UI: confirmation
+deactivate ServiceVente
+@enduml

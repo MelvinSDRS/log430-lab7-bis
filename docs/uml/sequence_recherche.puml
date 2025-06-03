@@ -1,0 +1,19 @@
+@startuml
+actor Caissier
+participant "CLI" as UI
+participant "ServiceProduit" as Service
+participant "RepositoryProduit" as RepoProduit
+participant "BD PostgreSQL" as BD
+
+Caissier -> UI: rechercheProduit(critère)
+UI -> Service: rechercher(type, valeur)
+activate Service
+Service -> RepoProduit: rechercher(critères)
+RepoProduit -> BD: SELECT ... WHERE ...
+BD --> RepoProduit: résultats
+RepoProduit --> Service: liste de produits
+Service -> Service: filtrerResultats()
+Service --> UI: produitsFiltres
+UI --> Caissier: afficherResultats()
+deactivate Service
+@enduml 
