@@ -8,7 +8,7 @@ Bienvenue dans la documentation du système de point de vente multi-magasins dé
 - **Lab 1** : Architecture client/serveur 2-tier pour un magasin (3 caisses)
 - **Lab 2** : Architecture 3-tier multi-magasins avec interface web MVC
 
-## Structure de la documentation (format Arc42)
+## Structure de la documentation
 
 ### Analyse des besoins
 - [Analyse des Besoins Fonctionnels et Non-Fonctionnels](analyse-besoins.md)
