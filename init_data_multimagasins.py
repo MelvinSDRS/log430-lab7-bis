@@ -195,6 +195,8 @@ def init_caisses_caissiers(session, entites):
     existing_caisses = session.query(CaisseModel).first()
     if existing_caisses:
         print("Caisses déjà existantes, nettoyage des doublons...")
+        session.query(LigneVenteModel).delete()
+        session.query(VenteModel).delete()
         session.query(CaissierModel).delete()
         session.query(CaisseModel).delete()
         session.commit()
