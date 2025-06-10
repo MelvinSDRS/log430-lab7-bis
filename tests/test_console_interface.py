@@ -84,17 +84,16 @@ class TestInterfaceConsoleEtendue:
         mock_stock.quantite = 150
         mock_stock.seuil_alerte = 10
         
-        app.service_inventaire.obtenir_stocks_par_entite.return_value = [mock_stock]
-        
-        # Test que la méthode existe et fonctionne
-        assert callable(app.consulter_stock_central)
-        
-        with patch('src.client.console.console.input', return_value='6'):
-            with patch('src.client.console.console.print'):
-                # Vérifier que les stocks sont bien récupérés
-                stocks = app.service_inventaire.obtenir_stocks_par_entite(6)
-                assert len(stocks) == 1
-                assert stocks[0].produit.nom == "Produit Test"
+        with patch.object(app.service_inventaire, 'obtenir_stocks_par_entite', return_value=[mock_stock]):
+            # Test que la méthode existe et fonctionne
+            assert callable(app.consulter_stock_central)
+            
+            with patch('src.client.console.console.input', return_value='6'):
+                with patch('src.client.console.console.print'):
+                    # Vérifier que les stocks sont bien récupérés
+                    stocks = app.service_inventaire.obtenir_stocks_par_entite(6)
+                    assert len(stocks) == 1
+                    assert stocks[0].produit.nom == "Produit Test"
 
     def test_demande_approvisionnement(self, app_console_magasin):
         """Test création demande approvisionnement depuis un magasin"""
@@ -107,13 +106,16 @@ class TestInterfaceConsoleEtendue:
             id_entite_fournisseur=6,
             id_produit=1,
             quantite_demandee=50,
-            statut=StatutDemande.EN_ATTENTE
+            quantite_approuvee=None,
+            statut=StatutDemande.EN_ATTENTE,
+            date_demande=datetime.now(),
+            date_traitement=None,
+            commentaire=None
         )
         
-        app.service_approvisionnement.creer_demande_approvisionnement.return_value = mock_demande
-        
-        # Test que la méthode existe
-        assert callable(app.demander_approvisionnement)
+        with patch.object(app.service_approvisionnement, 'creer_demande_approvisionnement', return_value=mock_demande):
+            # Test que la méthode existe
+            assert callable(app.demander_approvisionnement)
 
     def test_generation_rapport_ventes_maison_mere(self, app_console_maison_mere):
         """Test génération rapport ventes depuis maison mère"""
@@ -124,8 +126,8 @@ class TestInterfaceConsoleEtendue:
         mock_rapport.id = 1
         mock_rapport.titre = "Rapport consolidé des ventes"
         
-        app.service_rapport.generer_rapport_ventes_consolide.return_value = mock_rapport
-        assert callable(app.generer_rapport_ventes)
+        with patch.object(app.service_rapport, 'generer_rapport_ventes_consolide', return_value=mock_rapport):
+            assert callable(app.generer_rapport_ventes)
         
         # Vérifier restriction à la maison mère
         assert app.entite.type_entite == TypeEntite.MAISON_MERE
@@ -138,8 +140,8 @@ class TestInterfaceConsoleEtendue:
         mock_rapport.id = 2
         mock_rapport.titre = "Rapport des stocks"
         
-        app.service_rapport.generer_rapport_stocks.return_value = mock_rapport 
-        assert callable(app.generer_rapport_stocks)
+        with patch.object(app.service_rapport, 'generer_rapport_stocks', return_value=mock_rapport):
+            assert callable(app.generer_rapport_stocks)
         assert app.entite.type_entite == TypeEntite.MAISON_MERE
 
     def test_gestion_produits_maison_mere(self, app_console_maison_mere):
@@ -148,15 +150,15 @@ class TestInterfaceConsoleEtendue:
         
         # Mock des produits
         mock_produits = [
-            Produit(id=1, nom="Produit 1", prix=Decimal('10.00'), stock=100),
-            Produit(id=2, nom="Produit 2", prix=Decimal('15.00'), stock=50)
+            Produit(id=1, nom="Produit 1", prix=Decimal('10.00'), stock=100, id_categorie=1),
+            Produit(id=2, nom="Produit 2", prix=Decimal('15.00'), stock=50, id_categorie=1)
         ]
         
-        app.service_produit.repo_produit.lister_tous.return_value = mock_produits
-        assert callable(app.gestion_produits)
-        assert callable(app.lister_tous_produits)
-        assert callable(app.ajouter_nouveau_produit)
-        assert callable(app.modifier_produit)
+        with patch.object(app.service_produit.repo_produit, 'lister_tous', return_value=mock_produits):
+            assert callable(app.gestion_produits)
+            assert callable(app.lister_tous_produits)
+            assert callable(app.ajouter_nouveau_produit)
+            assert callable(app.modifier_produit)
         
         # Vérifier restriction à la maison mère
         assert app.entite.type_entite == TypeEntite.MAISON_MERE
@@ -173,12 +175,16 @@ class TestInterfaceConsoleEtendue:
                 id_entite_fournisseur=6,
                 id_produit=1,
                 quantite_demandee=30,
-                statut=StatutDemande.EN_ATTENTE
+                quantite_approuvee=None,
+                statut=StatutDemande.EN_ATTENTE,
+                date_demande=datetime.now(),
+                date_traitement=None,
+                commentaire=None
             )
         ]
         
-        app.service_approvisionnement.lister_demandes_en_attente.return_value = mock_demandes
-        assert callable(app.traiter_demandes_approvisionnement)
+        with patch.object(app.service_approvisionnement, 'lister_demandes_en_attente', return_value=mock_demandes):
+            assert callable(app.traiter_demandes_approvisionnement)
         
         # Vérifier restriction au centre logistique
         assert app.entite.type_entite == TypeEntite.CENTRE_LOGISTIQUE

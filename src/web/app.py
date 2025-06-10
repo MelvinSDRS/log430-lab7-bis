@@ -30,6 +30,44 @@ def create_app():
         datetime=datetime
     )
     
+    @app.route('/')
+    def index():
+        """Page d'accueil - Interface web légère pour supervision"""
+        app.logger.info("Accès à l'interface de supervision")
+        return render_template('index.html')
+
+    @app.route('/dashboard')
+    def dashboard():
+        """UC3 - Tableau de bord avec indicateurs clés pour supervision"""
+        app.logger.info("Accès au tableau de bord de supervision")
+        
+        session = get_db_session()
+        try:
+            service_tableau_bord = ServiceTableauBord(session)
+            indicateurs = service_tableau_bord.obtenir_indicateurs_performance()
+            
+            app.logger.info(f"Tableau de bord généré - {len(indicateurs)} magasins")
+            return render_template('dashboard.html', 
+                                   indicateurs=indicateurs,
+                                   titre="Supervision - Indicateurs clés")
+        except Exception as e:
+            app.logger.error(f"Erreur génération tableau de bord: {str(e)}")
+            flash("Erreur lors du chargement des indicateurs", "error")
+            return redirect(url_for('index'))
+        finally:
+            session.close()
+
+    @app.errorhandler(404)
+    def page_not_found(e):
+        """Gestionnaire d'erreur 404"""
+        return render_template('404.html'), 404
+
+    @app.errorhandler(500)
+    def internal_server_error(e):
+        """Gestionnaire d'erreur 500"""
+        app.logger.error(f"Erreur interne: {str(e)}")
+        return render_template('500.html'), 500
+    
     return app
 
 
@@ -76,49 +114,6 @@ def configure_logging(app):
 
 
 app = create_app()
-
-
-@app.route('/')
-def index():
-    """Page d'accueil - Interface web légère pour supervision"""
-    app.logger.info("Accès à l'interface de supervision")
-    return render_template('index.html')
-
-
-@app.route('/dashboard')
-def dashboard():
-    """UC3 - Tableau de bord avec indicateurs clés pour supervision"""
-    app.logger.info("Accès au tableau de bord de supervision")
-    
-    session = get_db_session()
-    try:
-        service_tableau_bord = ServiceTableauBord(session)
-        indicateurs = service_tableau_bord.obtenir_indicateurs_performance()
-        
-        app.logger.info(f"Tableau de bord généré - {len(indicateurs)} magasins")
-        return render_template('dashboard.html', 
-                               indicateurs=indicateurs,
-                               titre="Supervision - Indicateurs clés")
-    except Exception as e:
-        app.logger.error(f"Erreur génération tableau de bord: {str(e)}")
-        flash("Erreur lors du chargement des indicateurs", "error")
-        return redirect(url_for('index'))
-    finally:
-        session.close()
-
-
-
-@app.errorhandler(404)
-def page_not_found(e):
-    """Gestionnaire d'erreur 404"""
-    return render_template('404.html'), 404
-
-
-@app.errorhandler(500)
-def internal_server_error(e):
-    """Gestionnaire d'erreur 500"""
-    app.logger.error(f"Erreur interne: {str(e)}")
-    return render_template('500.html'), 500
 
 
 if __name__ == '__main__':

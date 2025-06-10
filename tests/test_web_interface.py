@@ -29,30 +29,45 @@ class TestInterfaceWebSupervision:
 
     def test_route_accueil(self, client):
         """Test de la route d'accueil"""
-        with patch('src.web.app.get_db_session'):
-            response = client.get('/')
-        
+        response = client.get('/')
         assert response.status_code == 200
 
     def test_route_dashboard(self, client):
         """Test de la route dashboard (tableau de bord)"""
-        with patch('src.web.app.get_db_session') as mock_session:
-            # Mock du service tableau de bord
-            mock_service = Mock()
-            mock_service.obtenir_indicateurs_performance.return_value = []
-            
-            with patch('src.web.app.ServiceTableauBord', return_value=mock_service):
+        mock_session = Mock()
+        mock_indicateurs = [
+            IndicateurPerformance(
+                entite_id=1,
+                entite_nom="Magasin Test",
+                chiffre_affaires=Decimal("1000.00"),
+                nombre_ventes=10,
+                produits_en_rupture=2,
+                produits_en_surstock=1,
+                tendance_hebdomadaire=Decimal("5.0")
+            )
+        ]
+        
+        with patch('src.web.app.get_db_session', return_value=mock_session):
+            with patch('src.web.app.ServiceTableauBord') as mock_service_class:
+                mock_service = Mock()
+                mock_service.obtenir_indicateurs_performance.return_value = mock_indicateurs
+                mock_service_class.return_value = mock_service
+                
                 response = client.get('/dashboard')
         
         assert response.status_code == 200
 
     def test_dashboard_performance(self, client):
         """Test performance dashboard"""
-        with patch('src.web.app.get_db_session') as mock_session:
-            mock_service = Mock()
-            mock_service.obtenir_indicateurs_performance.return_value = []
-            
-            with patch('src.web.app.ServiceTableauBord', return_value=mock_service):
+        mock_session = Mock()
+        mock_indicateurs = []
+        
+        with patch('src.web.app.get_db_session', return_value=mock_session):
+            with patch('src.web.app.ServiceTableauBord') as mock_service_class:
+                mock_service = Mock()
+                mock_service.obtenir_indicateurs_performance.return_value = mock_indicateurs
+                mock_service_class.return_value = mock_service
+                
                 start_time = time.time()
                 response = client.get('/dashboard')
                 end_time = time.time()
@@ -63,11 +78,15 @@ class TestInterfaceWebSupervision:
 
     def test_auto_refresh_dashboard(self, client):
         """Vérifier que le dashboard a l'auto-refresh"""
-        with patch('src.web.app.get_db_session') as mock_session:
-            mock_service = Mock()
-            mock_service.obtenir_indicateurs_performance.return_value = []
-            
-            with patch('src.web.app.ServiceTableauBord', return_value=mock_service):
+        mock_session = Mock()
+        mock_indicateurs = []
+        
+        with patch('src.web.app.get_db_session', return_value=mock_session):
+            with patch('src.web.app.ServiceTableauBord') as mock_service_class:
+                mock_service = Mock()
+                mock_service.obtenir_indicateurs_performance.return_value = mock_indicateurs
+                mock_service_class.return_value = mock_service
+                
                 response = client.get('/dashboard')
         
         assert response.status_code == 200

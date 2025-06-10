@@ -15,7 +15,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /build
 
-RUN pip install --no-cache-dir sqlalchemy rich pytest pytest-cov flake8 psycopg2-binary flask
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt pytest-cov flake8
 
 # Production stage
 FROM python:3.11-slim AS production
