@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Tests de performance pour le système POS
-Valide les performances de l'architecture 2-tier client/serveur
+Tests de performance pour le système POS multi-magasins
+Architecture console + web : console pour opérations, web pour supervision.
+Valide les performances des UC1-UC6 selon leur interface spécifique.
 """
 
 import time
@@ -15,7 +16,7 @@ from src.domain.entities import LigneVente
 
 
 class PerformanceTester:
-    """Testeur de performance pour le système POS 2-tier"""
+    """Testeur de performance pour le système POS multi-magasins"""
 
     def __init__(self):
         create_tables()
@@ -226,14 +227,14 @@ class PerformanceTester:
         try:
             # Tests des opérations de base
             stats = self.test_operations_base(100)
-            print("  • Recherche par ID:")
+            print("  - Recherche par ID:")
             print(f"    - Temps moyen: "
                   f"{stats['recherche_id']['moyenne']*1000:.2f}ms")
             print(f"    - Temps médian: "
                   f"{stats['recherche_id']['mediane']*1000:.2f}ms")
             print(f"    - Temps max: "
                   f"{stats['recherche_id']['max']*1000:.2f}ms")
-            print("  • Recherche par nom:")
+            print("  - Recherche par nom:")
             print(f"    - Temps moyen: "
                   f"{stats['recherche_nom']['moyenne']*1000:.2f}ms")
             print(f"    - Temps médian: "
@@ -244,30 +245,30 @@ class PerformanceTester:
 
             # Test de 3 caisses simultanées
             resultats = self.test_caisses_simultanees(15)
-            print(f"  • Durée totale: {resultats['temps_total']:.2f}s")
-            print(f"  • Ventes totales réussies: "
+            print(f"  - Durée totale: {resultats['temps_total']:.2f}s")
+            print(f"  - Ventes totales réussies: "
                   f"{resultats['total_ventes']}")
-            print(f"  • Erreurs totales: {resultats['total_erreurs']}")
-            print(f"  • Throughput: {resultats['throughput']:.1f} "
+            print(f"  - Erreurs totales: {resultats['total_erreurs']}")
+            print(f"  - Throughput: {resultats['throughput']:.1f} "
                   f"ventes/seconde")
-            print(f"  • Temps moyen par vente: "
+            print(f"  - Temps moyen par vente: "
                   f"{resultats['temps_moyen_vente']*1000:.2f}ms")
             for r in resultats['resultats_par_caisse']:
-                print(f"  • Caisse {r['caisse_id']}: "
+                print(f"  - Caisse {r['caisse_id']}: "
                       f"{r['ventes_reussies']} ventes, "
                       f"{len(r['erreurs'])} erreurs")
             print()
 
             # Test de charge
             resultats_charge = self.test_charge_recherche(3, 30)
-            print(f"  • Durée totale: {resultats_charge['temps_total']:.2f}s")
-            print(f"  • Recherches totales: "
+            print(f"  - Durée totale: {resultats_charge['temps_total']:.2f}s")
+            print(f"  - Recherches totales: "
                   f"{resultats_charge['total_recherches']}")
-            print(f"  • Throughput: {resultats_charge['throughput']:.1f} "
+            print(f"  - Throughput: {resultats_charge['throughput']:.1f} "
                   f"recherches/seconde")
-            print(f"  • Temps moyen: "
+            print(f"  - Temps moyen: "
                   f"{resultats_charge['temps_moyen']*1000:.2f}ms")
-            print(f"  • Temps médian: "
+            print(f"  - Temps médian: "
                   f"{resultats_charge['temps_median']*1000:.2f}ms")
             print()
 

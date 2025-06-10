@@ -1,9 +1,47 @@
 @startuml
-package "Application POS" {
-  [CLI] --> [Couche Domaine]
-  [Couche Domaine] --> [Services Applicatifs]
-  [Services Applicatifs] --> [Adaptateur Persistance]
-  [Adaptateur Persistance] --> [BD PostgreSQL]
+package "Système POS Multi-Magasins" {
+
+  ' Interfaces utilisateur
+  package "Couche Présentation" {
+    [Interface Console] as CONSOLE
+    [Interface Web] as WEB
+  }
+  
+  ' Logique métier centralisée
+  package "Couche Métier" {
+    [Services Métier] as SERVICES
+    [Entités Domaine] as ENTITIES
+  }
+  
+  ' Persistance
+  package "Couche Données" {
+    [Repositories] as REPOS
+    [Base PostgreSQL] as DB
+  }
 }
-database "BD PostgreSQL" as db
+
+' Relations
+CONSOLE --> SERVICES : Opérations
+WEB --> SERVICES : Supervision
+SERVICES --> ENTITIES
+SERVICES --> REPOS
+REPOS --> DB
+
+' Annotations
+note right of CONSOLE
+  UC1, UC2, UC4, UC6
+  + Fonctions POS Lab1
+end note
+
+note right of WEB
+  UC3, UC8
+  Tableau de bord
+end note
+
+note right of SERVICES
+  ServiceVente
+  ServiceApprovisionnement
+  ServiceTableauBord
+end note
+
 @enduml

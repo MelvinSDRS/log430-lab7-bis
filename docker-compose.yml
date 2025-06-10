@@ -1,105 +1,161 @@
+version: '3.8'
+
 services:
-  # PostgreSQL Database Server (Serveur)
+  # Base de données PostgreSQL centralisée
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: pos-postgres
-    restart: unless-stopped
     environment:
-      POSTGRES_DB: pos_system
+      POSTGRES_DB: pos_multimagasins
       POSTGRES_USER: pos_user
       POSTGRES_PASSWORD: pos_password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - pos-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pos_user -d pos_system"]
+      test: ["CMD-SHELL", "pg_isready -U pos_user -d pos_multimagasins"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Database initialization service
-  init-data-auto:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-    container_name: pos-init-data-auto
-    command: python init_data.py
+  # Interface web administrative (Maison mère)
+  web-admin:
+    build: .
+    container_name: pos-web-admin
+    command: python -m src.web.app
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+    volumes:
+      - .:/app
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - pos-network
+    restart: unless-stopped
+
+  # Interface Console Magasin 1
+  pos-magasin-1:
+    build: .
+    container_name: pos-magasin-1
+    command: python main.py
     environment:
-      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_system
-      - PYTHONPATH=/app
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
+      - ENTITE_ID=1
+      - ENTITE_NOM=POS Vieux-Montréal
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pos-network
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # Interface Console Magasin 2
+  pos-magasin-2:
+    build: .
+    container_name: pos-magasin-2
+    command: python main.py
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
+      - ENTITE_ID=2
+      - ENTITE_NOM=POS Plateau Mont-Royal
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pos-network
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # Interface Console Magasin 3
+  pos-magasin-3:
+    build: .
+    container_name: pos-magasin-3
+    command: python main.py
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
+      - ENTITE_ID=3
+      - ENTITE_NOM=POS Quartier des Spectacles
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pos-network
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # Interface Console Magasin 4
+  pos-magasin-4:
+    build: .
+    container_name: pos-magasin-4
+    command: python main.py
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
+      - ENTITE_ID=4
+      - ENTITE_NOM=POS Mile End
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pos-network
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # Interface Console Magasin 5
+  pos-magasin-5:
+    build: .
+    container_name: pos-magasin-5
+    command: python main.py
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
+      - ENTITE_ID=5
+      - ENTITE_NOM=POS Westmount
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pos-network
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # Initialisation des données multi-magasins
+  init-data:
+    build: .
+    container_name: pos-init-data
+    command: python init_data_multimagasins.py
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - pos-network
     restart: "no"
-
-  # POS Application Client 1 (Client)
-  pos-app-1:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-    container_name: pos-client-1
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      init-data-auto:
-        condition: service_completed_successfully
-    environment:
-      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_system
-      - PYTHONPATH=/app
-    stdin_open: true
-    tty: true
-    networks:
-      - pos-network
-
-  # POS Application Client 2 (Client)
-  pos-app-2:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-    container_name: pos-client-2
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      init-data-auto:
-        condition: service_completed_successfully
-    environment:
-      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_system
-      - PYTHONPATH=/app
-    stdin_open: true
-    tty: true
-    networks:
-      - pos-network
-
-  # POS Application Client 3 (Client)
-  pos-app-3:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-    container_name: pos-client-3
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      init-data-auto:
-        condition: service_completed_successfully
-    environment:
-      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_system
-      - PYTHONPATH=/app
-    stdin_open: true
-    tty: true
-    networks:
-      - pos-network
 
   # Test service
   pos-test:
@@ -108,12 +164,12 @@ services:
       dockerfile: Dockerfile
       target: production
     container_name: pos-test
-    command: sh -c "python init_data.py && pytest tests/ -v"
+    command: sh -c "python init_data_multimagasins.py && pytest tests/ -v"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_system
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
       - PYTHONPATH=/app
     user: "root"
     profiles:
@@ -123,8 +179,7 @@ services:
 
 volumes:
   postgres_data:
-    driver: local
 
 networks:
   pos-network:
-    driver: bridge 
+    driver: bridge

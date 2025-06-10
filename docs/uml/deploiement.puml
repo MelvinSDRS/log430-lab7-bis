@@ -1,30 +1,88 @@
 @startuml
-title Architecture Client/Serveur 2-Tier - Système POS
+title Architecture 3-Tier - Système POS Multi-Magasins
 
-node "Serveur PostgreSQL" {
-  database "pos-postgres\n:5432" as DB
+' Tier 1 - Base de données centralisée
+node "Serveur Central" {
+  database "PostgreSQL\n:5432" as DB {
+    folder "pos_multimagasins" as schema
+}
 }
 
-node "Client 1" {
-  component "pos-client-1" as App1
+' Tier 2 - Services métier (logique)
+node "Services Métier" {
+  component "ServiceProduit" as SP
+  component "ServiceVente" as SV
+  component "ServiceApprovisionnement" as SA
+  component "ServiceRapport" as SR
 }
 
-node "Client 2" {
-  component "pos-client-2" as App2
+' Tier 3 - Interfaces utilisateur (présentation)
+' Magasins avec interface console
+node "Magasin 1" {
+  component "Console POS\nCaisse 1-3" as M1
 }
 
-node "Client 3" {
-  component "pos-client-3" as App3
+node "Magasin 2" {
+  component "Console POS\nCaisse 4-6" as M2
 }
 
-App1 --> DB : SQL
-App2 --> DB : SQL
-App3 --> DB : SQL
+node "Magasin 3" {
+  component "Console POS\nCaisse 7-9" as M3
+}
+
+node "Magasin 4" {
+  component "Console POS\nCaisse 10-12" as M4
+}
+
+node "Magasin 5" {
+  component "Console POS\nCaisse 13-15" as M5
+}
+
+' Centre logistique avec interface web
+node "Centre Logistique" {
+  component "Interface Web\nGestion Stocks" as CL
+}
+
+' Maison mère avec interface web
+node "Maison Mère" {
+  component "Interface Web\nRapports & Admin" as MM
+}
+
+' Connexions Tier 3 → Tier 2
+M1 --> SP
+M1 --> SV
+M1 --> SA
+M2 --> SP
+M2 --> SV
+M2 --> SA
+M3 --> SP
+M3 --> SV
+M3 --> SA
+M4 --> SP
+M4 --> SV
+M4 --> SA
+M5 --> SP
+M5 --> SV
+M5 --> SA
+
+CL --> SA
+CL --> SP
+MM --> SR
+MM --> SP
+
+' Connexions Tier 2 → Tier 1
+SP --> DB
+SV --> DB
+SA --> DB
+SR --> DB
 
 note bottom
-  Architecture 2-Tier:
-  • Tier 1: Base de données PostgreSQL
-  • Tier 2: 3 Applications console
+  Architecture 3-Tier Multi-Magasins:
+  - Tier 1: PostgreSQL centralisé
+  - Tier 2: Services métier partagés
+  - Tier 3: Interface console (opérationnel) + web (supervision)
+  
+  Entités: 5 magasins + 1 centre logistique + 1 maison mère
 end note
 
 @enduml

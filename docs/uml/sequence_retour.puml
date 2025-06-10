@@ -1,23 +1,74 @@
 @startuml
-actor Caissier
-participant UI
-participant ServiceVente
-participant RepositoryProduit
-participant RepositoryVente
-participant "BD PostgreSQL" as BD
+participant "Responsable Logistique" as RL
+participant "Interface Web" as UI
+participant "ServiceApprovisionnement" as SA
+participant "ServiceInventaire" as SI
+participant "RepositoryDemande" as RD
+participant "RepositoryStockEntite" as RSE
+participant "Base de Données" as BD
 
-Caissier -> UI: retournerVente(idVente)
-UI -> ServiceVente: retourner_vente()
-activate ServiceVente
-ServiceVente -> RepositoryVente: obtenir_par_id(idVente)
-RepositoryVente -> BD: SELECT vente
-BD --> RepositoryVente
-ServiceVente -> RepositoryProduit: mettre_a_jour_stock()
-RepositoryProduit -> BD: UPDATE stock
-BD --> RepositoryProduit
-ServiceVente -> RepositoryVente: marquer_comme_retournee()
-RepositoryVente -> BD: UPDATE statut
-BD --> RepositoryVente
-ServiceVente --> UI: confirmation
-deactivate ServiceVente
+RL -> UI: Consulter demandes d'approvisionnement
+UI -> SA: lister_demandes_en_attente(centre_logistique_id)
+activate SA
+
+SA -> RD: lister_par_fournisseur_et_statut(centre_id, EN_ATTENTE)
+activate RD
+RD -> BD: SELECT demandes WHERE fournisseur AND statut
+BD --> RD: demandes en attente
+RD --> SA: liste demandes
+deactivate RD
+
+SA --> UI: afficher demandes pendantes
+UI --> RL: Liste des demandes d'approvisionnement
+
+RL -> UI: Valider demande (demande_id)
+UI -> SA: valider_demande(demande_id)
+activate SA
+
+SA -> RD: obtenir_demande(demande_id)
+RD -> BD: SELECT demande
+BD --> RD: détails demande
+RD --> SA: demande
+
+SA -> SI: verifier_stock_fournisseur(id_produit, quantite, centre_id)
+activate SI
+SI -> RSE: consulter_stock(id_produit, centre_id)
+RSE -> BD: SELECT stock_entite
+BD --> RSE: stock disponible
+RSE --> SI: quantité centre
+SI --> SA: validation stock
+deactivate SI
+
+alt Stock suffisant
+    SA -> SA: effectuer_transfert(demande)
+    SA -> SI: transferer_stock(centre_id, magasin_id, produit, quantite)
+    activate SI
+    SI -> RSE: reduire_stock(centre_id, produit, quantite)
+    SI -> RSE: augmenter_stock(magasin_id, produit, quantite)
+    RSE -> BD: UPDATE stocks centre et magasin
+    BD --> RSE: transfert effectué
+    RSE --> SI: stocks mis à jour
+    SI --> SA: transfert confirmé
+    deactivate SI
+    
+    SA -> RD: mettre_a_jour_statut(demande_id, LIVREE)
+    RD -> BD: UPDATE demande SET statut='LIVREE'
+    BD --> RD: statut mis à jour
+    RD --> SA: demande livrée
+    
+    SA --> UI: transfert_id
+    UI --> RL: Approvisionnement effectué avec succès
+else Stock insuffisant
+    SA --> UI: erreur_stock_insuffisant
+    UI --> RL: Stock insuffisant au centre logistique
+end
+
+deactivate SA
+
+note right of SA
+  UC6: Approvisionnement magasin
+  Validation et transfert de stock
+  Mise à jour statuts demandes
+end note
+
 @enduml

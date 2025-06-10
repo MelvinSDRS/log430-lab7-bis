@@ -1,0 +1,36 @@
+@startuml
+participant "Gestionnaire MM" as GM
+participant "Interface Web" as UI
+participant "ServiceTableauBord" as STB
+participant "RepositoryVente" as RV
+participant "Base de Données" as BD
+
+GM -> UI: UC3 - Accéder tableau de bord
+UI -> STB: calculer_indicateurs_performance()
+activate STB
+
+STB -> RV: obtenir_donnees_journalieres()
+activate RV
+RV -> BD: SELECT ventes, stocks du jour
+BD --> RV: données temps réel
+RV --> STB: indicateurs bruts
+deactivate RV
+
+STB -> STB: calculer_kpi()
+note right: CA jour, nb ventes,\nstocks faibles, tendances
+
+STB --> UI: IndicateurPerformance
+deactivate STB
+
+UI -> UI: formater_dashboard()
+UI --> GM: Affichage tableau de bord
+
+note right of UI
+  UC3: Supervision web
+  - Chiffre d'affaires du jour
+  - Nombre de ventes
+  - Alertes stocks faibles
+  - Refresh automatique
+end note
+
+@enduml 

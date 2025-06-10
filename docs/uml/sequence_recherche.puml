@@ -1,19 +1,52 @@
 @startuml
-actor Caissier
-participant "CLI" as UI
-participant "ServiceProduit" as Service
-participant "RepositoryProduit" as RepoProduit
-participant "BD PostgreSQL" as BD
+participant "Employé Magasin" as EM
+participant "Console POS" as UI
+participant "ServiceApprovisionnement" as SA
+participant "ServiceInventaire" as SI
+participant "RepositoryStockEntite" as RSE
+participant "RepositoryEntite" as RE
+participant "Base de Données" as BD
 
-Caissier -> UI: rechercheProduit(critère)
-UI -> Service: rechercher(type, valeur)
-activate Service
-Service -> RepoProduit: rechercher(critères)
-RepoProduit -> BD: SELECT ... WHERE ...
-BD --> RepoProduit: résultats
-RepoProduit --> Service: liste de produits
-Service -> Service: filtrerResultats()
-Service --> UI: produitsFiltres
-UI --> Caissier: afficherResultats()
-deactivate Service
+EM -> UI: Consulter stock central pour produit
+UI -> SA: consulter_stock_central(id_produit)
+activate SA
+
+SA -> RE: obtenir_centre_logistique()
+activate RE
+RE -> BD: SELECT entite WHERE type='CENTRE_LOGISTIQUE'
+BD --> RE: centre logistique
+RE --> SA: entite_logistique
+deactivate RE
+
+SA -> SI: consulter_stock_entite(id_produit, id_centre_logistique)
+activate SI
+SI -> RSE: obtenir_stock(id_produit, id_entite)
+RSE -> BD: SELECT stock_entite
+BD --> RSE: quantité disponible
+RSE --> SI: stock central
+SI --> SA: quantité centre logistique
+deactivate SI
+
+SA --> UI: afficher stock central avec statut
+UI --> EM: Stock central affiché
+
+alt Stock suffisant et demande d'approvisionnement
+    EM -> UI: Créer demande approvisionnement
+    UI -> SA: creer_demande(id_entite_magasin, id_produit, quantite)
+    activate SA
+    
+    SA -> BD: INSERT demande_approvisionnement
+    BD --> SA: demande créée
+    
+    SA --> UI: demande_id
+    deactivate SA
+    UI --> EM: Demande créée avec ID
+end
+
+note right of SA
+  UC2: Consultation stock central
+  Création demande si nécessaire
+  Évite ruptures locales
+end note
+
 @enduml 

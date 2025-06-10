@@ -1,20 +1,50 @@
 @startuml
-actor Caissier
-participant "CLI" as UI
-participant "ServiceVente" as Service
-participant "RepositoryProduit" as RepoProduit
-participant "RepositoryVente" as RepoVente
-participant "BD PostgreSQL" as BD
+participant "Employé Magasin" as EM
+participant "Console POS" as UI
+participant "ServiceVente" as SV
+participant "ServiceInventaire" as SI
+participant "RepositoryVente" as RV
+participant "RepositoryProduit" as RP
+participant "Base de Données" as BD
 
-Caissier -> UI: creerVente()
-UI -> Service: creerVente(panier)
-activate Service
-Service -> RepoProduit: mettre_a_jour_stock()
-RepoProduit -> BD: UPDATE stock
-RepoProduit <-- BD
-Service -> RepoVente: sauvegarder(vente)
-RepoVente -> BD: INSERT vente, lignes_vente
-BD --> RepoVente
-Service --> UI: idVente
-deactivate Service
+EM -> UI: Sélectionner produits et quantités
+UI -> SV: creer_vente(panier, id_caisse, id_caissier, id_entite)
+activate SV
+
+SV -> SI: verifier_disponibilite(panier, id_entite)
+activate SI
+SI -> RP: consulter_stocks(produits, id_entite)
+RP -> BD: SELECT stocks par entité
+BD --> RP: stocks disponibles
+RP --> SI: disponibilités
+SI --> SV: validation stocks
+deactivate SI
+
+SV -> SI: reserver_stock(panier, id_entite)
+activate SI
+SI -> RP: mettre_a_jour_stocks(produits, quantites, id_entite)
+RP -> BD: UPDATE stocks
+BD --> RP: confirmation
+RP --> SI: stocks réservés
+SI --> SV: réservation confirmée
+deactivate SI
+
+SV -> RV: sauvegarder(vente)
+activate RV
+RV -> BD: INSERT vente avec id_entite
+RV -> BD: INSERT lignes_vente
+BD --> RV: vente sauvegardée
+RV --> SV: vente créée
+deactivate RV
+
+SV --> UI: id_vente
+deactivate SV
+UI --> EM: Vente confirmée
+
+note right of SV
+  Nouveauté Lab 2:
+  Gestion par entité (magasin)
+  Stocks séparés par magasin
+end note
+
 @enduml

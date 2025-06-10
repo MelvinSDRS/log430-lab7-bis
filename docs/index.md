@@ -1,8 +1,14 @@
-# Système de Point de Vente (POS) - Documentation
+# Système de Point de Vente Multi-Magasins - Documentation
 
-Bienvenue dans la documentation du système de point de vente développé pour le laboratoire 1 de LOG430. Cette application est conçue comme un système de caisse pour un petit magasin de quartier, avec une architecture client/serveur à deux niveaux.
+Bienvenue dans la documentation du système de point de vente multi-magasins développé pour le laboratoire 2 de LOG430. Cette application est conçue comme un système de gestion centralisé pour une entreprise possédant cinq magasins, un centre de logistique et une maison mère.
 
-## Structure de la documentation
+## Évolution du système
+
+### Lab 1 → Lab 2
+- **Lab 1** : Architecture client/serveur 2-tier pour un magasin (3 caisses)
+- **Lab 2** : Architecture 3-tier multi-magasins avec interface web MVC
+
+## Structure de la documentation (format Arc42)
 
 ### Analyse des besoins
 - [Analyse des Besoins Fonctionnels et Non-Fonctionnels](analyse-besoins.md)
@@ -14,6 +20,8 @@ Bienvenue dans la documentation du système de point de vente développé pour l
 - [ADR 001: Choix de la Plateforme](adr/001-choix-plateforme.md)
 - [ADR 002: Stratégie de Persistance](adr/002-strategie-persistence.md)
 - [ADR 003: Séparation des Responsabilités](adr/003-separation-responsabilites.md)
+- [ADR 004: Architecture MVC pour Interface Web](adr/004-architecture-mvc.md)
+- [ADR 005: Framework Web Flask](adr/005-framework-flask.md)
 
 ### Technologies
 - [Choix Technologiques](choix-technologiques.md)
@@ -23,4 +31,4 @@ Bienvenue dans la documentation du système de point de vente développé pour l
 
 ## Vision du projet
 
-Ce système de point de vente est conçu pour être simple, robuste et autonome, tout en étant évolutif pour répondre aux besoins futurs. L'objectif est de fournir une solution fiable pour un petit commerce qui pourrait éventuellement évoluer vers un système multi-succursales par exemple.
+Ce système multi-magasins est conçu pour être évolutif, maintenir la cohérence des données entre les différentes entités (magasins, centre logistique, maison mère) et fournir une supervision centralisée. L'architecture MVC permet une séparation claire des responsabilités et prépare l'évolution vers des interfaces web plus avancées.

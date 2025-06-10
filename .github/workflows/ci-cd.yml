@@ -33,7 +33,7 @@ jobs:
         uses: harmon758/postgresql-action@v1
         with:
           postgresql version: '15'
-          postgresql db: pos_system
+          postgresql db: pos_multimagasins
           postgresql user: pos_user
           postgresql password: pos_password
       
@@ -45,14 +45,14 @@ jobs:
       
       - name: Initialize test database
         env:
-          DATABASE_URL: postgresql://pos_user:pos_password@localhost:5432/pos_system
+          DATABASE_URL: postgresql://pos_user:pos_password@localhost:5432/pos_multimagasins
         run: |
-          python init_data.py
+          python init_data_multimagasins.py
           echo "✅ Database initialization successful"
       
       - name: Run unit tests
         env:
-          DATABASE_URL: postgresql://pos_user:pos_password@localhost:5432/pos_system
+          DATABASE_URL: postgresql://pos_user:pos_password@localhost:5432/pos_multimagasins
         run: |
           pytest tests/ -v --cov=src --cov-report=term-missing
           echo "✅ All tests passed"
@@ -109,16 +109,29 @@ jobs:
           # Check that all services are running
           docker compose ps
           
-          # Test database connectivity from client
-          docker compose exec -T pos-app-1 python -c "
+          # Test database connectivity and multi-store architecture
+          docker compose exec -T pos-magasin-1 python -c "
           from src.persistence.database import get_db_session
-          from src.persistence.models import CaisseModel
+          from src.persistence.models import CaisseModel, EntiteModel
           session = get_db_session()
+          
+          # Test total caisses (2 per magasin × 5 magasins = 10)
           caisses = session.query(CaisseModel).count()
-          session.close()
-          assert caisses >= 3, f'Expected at least 3 caisses, got {caisses}'
+          assert caisses >= 10, f'Expected at least 10 caisses (2 per store), got {caisses}'
           print(f'✅ Found {caisses} caisses in database')
+          
+          # Test entités (5 magasins + 1 centre logistique + 1 maison mère = 7)
+          entites = session.query(EntiteModel).count()
+          assert entites >= 7, f'Expected at least 7 entités, got {entites}'
+          print(f'✅ Found {entites} entités in multi-store architecture')
+          
+          session.close()
           "
+          
+          # Test web interface accessibility
+          echo "Testing web interface..."
+          timeout 30 bash -c 'until curl -f http://localhost:5000/health 2>/dev/null || curl -f http://localhost:5000/ 2>/dev/null; do echo "Waiting for web interface..."; sleep 2; done'
+          echo "✅ Web interface is accessible"
           
           # Run tests in Docker environment
           docker compose --profile test up --abort-on-container-exit pos-test

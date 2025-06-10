@@ -1,10 +1,54 @@
 @startuml
 left to right direction
-actor Caissier
-rectangle "Système POS" {
-  Caissier -- (Rechercher un produit)
-  Caissier -- (Enregistrer une vente)
-  Caissier -- (Gérer les retours)
-  Caissier -- (Consulter le stock)
+
+actor "Employé Magasin" as EM
+actor "Responsable Logistique" as RL
+actor "Gestionnaire Maison Mère" as GM
+
+rectangle "Système POS Multi-Magasins" {
+  
+  rectangle "Interface Console (Opérationnel)" as CONSOLE {
+    ' UC hérités du Lab 1
+    (Rechercher un produit) as UC_RECHERCHE
+    (Enregistrer une vente) as UC_VENTE
+    (Gérer les retours) as UC_RETOUR
+    
+    ' UC Lab 2 - Console
+    (UC1: Générer rapports) as UC1
+    (UC2: Consulter stock central) as UC2
+    (UC4: Gérer produits) as UC4
+    (UC6: Traiter approvisionnement) as UC6
+  }
+  
+  rectangle "Interface Web (Supervision)" as WEB {
+    (UC3: Tableau de bord) as UC3
+    (UC8: Supervision légère) as UC8
+  }
+  
+  ' Relations Console
+  EM -- UC_RECHERCHE
+  EM -- UC_VENTE
+  EM -- UC_RETOUR
+  EM -- UC2
+  
+  RL -- UC6
+  
+  GM -- UC1
+  GM -- UC4
+  
+  ' Relations Web
+  GM -- UC3
+  GM -- UC8
 }
+
+note right of CONSOLE
+  Fonctionnalités opérationnelles
+  Adaptées selon type d'entité
+end note
+
+note right of WEB
+  Supervision à distance
+  Interface légère
+end note
+
 @enduml

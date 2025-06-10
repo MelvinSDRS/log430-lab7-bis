@@ -1,0 +1,45 @@
+@startuml
+participant "Gestionnaire MM" as GM
+participant "Console Admin" as UI
+participant "ServiceRapport" as SR
+participant "ServiceTableauBord" as STB
+participant "RepositoryVente" as RV
+participant "RepositoryEntite" as RE
+participant "Base de Données" as BD
+
+GM -> UI: UC1 - Générer rapport (période)
+UI -> SR: generer_rapport_consolide(date_debut, date_fin)
+activate SR
+
+SR -> RE: lister_magasins()
+activate RE
+RE -> BD: SELECT entites WHERE type='MAGASIN'
+BD --> RE: liste magasins
+RE --> SR: magasins
+deactivate RE
+
+SR -> RV: obtenir_ventes_toutes_entites(periode)
+activate RV
+RV -> BD: SELECT ventes avec entités
+BD --> RV: données consolidées
+RV --> SR: ventes par magasin
+deactivate RV
+
+SR -> STB: calculer_indicateurs_globaux(ventes)
+activate STB
+STB -> STB: analyser CA, tendances, top produits
+STB --> SR: indicateurs consolidés
+deactivate STB
+
+SR -> SR: formater_rapport()
+SR --> UI: rapport formaté
+UI --> GM: Affichage console avec tableaux
+
+note right of UI
+  UC1: Interface console
+  Rapport détaillé par magasin
+  Produits les plus vendus
+  Stocks critiques
+end note
+
+@enduml 

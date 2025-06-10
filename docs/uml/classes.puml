@@ -1,65 +1,90 @@
 @startuml
+' Entités métier principales
 class Produit {
   +id: int
   +nom: string
-  +prix: Monnaie
-  +quantiteEnStock: int
-  +id_categorie: int
+  +prix: Decimal
+  +stock: int
+  +seuil_alerte: int
 }
-class Categorie {
-  +id: int
-  +nom: string
-  +description: string
-}
+
 class Vente {
   +id: int
   +horodatage: datetime
-  +total: Monnaie
-  +id_caisse: int
-  +statut: string
-}
-class LigneVente {
-  +qte: int
-}
-class Caissier {
-  +id: int
-  +nom: string
-}
-class Caisse {
-  +id: int
-  +nom: string
-  +statut: string
-}
-class ServiceProduit {
-  +rechercher(critere, valeur): List[Produit]
-}
-class ServiceVente {
-  +creer_vente(panier, id_caisse, id_caissier): Vente
-  +retourner_vente(id_vente): boolean
-}
-class ServiceInventaire {
-  +verifier_disponibilite(panier): List[string]
-  +reserver_stock(panier)
-  +restituer_stock(panier)
-}
-class ServicePaiement {
-  +facturer(vente): boolean
-}
-class ServiceTransaction {
-  +commencer()
-  +valider()
-  +annuler()
+  +id_entite: int
+  +total(): Decimal
 }
 
-Produit "*" -- "1" Categorie
-Produit "1" -- "0..*" LigneVente
+class LigneVente {
+  +qte: int
+  +sous_total(): Decimal
+}
+
+' Entités multi-magasins
+class Entite {
+  +id: int
+  +nom: string
+  +type_entite: TypeEntite
+}
+
+class TypeEntite <<enumeration>> {
+  MAGASIN
+  CENTRE_LOGISTIQUE
+  MAISON_MERE
+}
+
+class StockEntite {
+  +id: int
+  +id_produit: int
+  +id_entite: int
+  +quantite: int
+}
+
+class DemandeApprovisionnement {
+  +id: int
+  +id_entite_demandeur: int
+  +id_produit: int
+  +quantite_demandee: int
+  +statut: StatutDemande
+}
+
+class StatutDemande <<enumeration>> {
+  EN_ATTENTE
+  APPROUVEE
+  LIVREE
+}
+
+' Services essentiels
+class ServiceVente {
+  +creer_vente(): Vente
+}
+
+class ServiceApprovisionnement {
+  +creer_demande(): DemandeApprovisionnement
+  +valider_demande(): void
+}
+
+class ServiceTableauBord {
+  +calculer_indicateurs(): IndicateurPerformance
+}
+
+' Relations principales
+Produit "1" -- "*" StockEntite
+Produit "1" -- "*" LigneVente
+Produit "1" -- "*" DemandeApprovisionnement
+
+Entite "1" -- "*" StockEntite
+Entite "1" -- "*" Vente
+
 LigneVente "*" -- "1" Vente
-Caissier "1" -- "0..*" Vente
-Caisse "1" -- "0..*" Vente
-Caissier "1" -- "1" Caisse : utilise >
-ServiceVente --> ServiceInventaire : utilise >
-ServiceVente --> ServicePaiement : utilise >
-ServiceVente --> ServiceTransaction : utilise >
-Vente --> ServiceVente : utilise >
-Vente --> ServiceProduit : utilise >
+DemandeApprovisionnement "*" -- "1" Entite
+
+TypeEntite -- Entite
+StatutDemande -- DemandeApprovisionnement
+
+' Relations services
+ServiceVente ..> Vente : crée
+ServiceApprovisionnement ..> DemandeApprovisionnement : gère
+ServiceTableauBord ..> Vente : analyse
+
 @enduml
