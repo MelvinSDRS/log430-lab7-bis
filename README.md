@@ -1,4 +1,4 @@
-# LOG430 - Lab 2 - Système POS Multi-Magasins
+# LOG430 - Lab 3 - Système POS Multi-Magasins
 
 ## Description
 
