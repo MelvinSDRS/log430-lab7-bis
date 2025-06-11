@@ -1,6 +1,6 @@
 # Choix Technologiques
 
-## Évolution Lab 1 → Lab 2
+## Évolution Lab 1 → Lab 2 → Lab 3
 
 ### Maintenu du Lab 1
 - **Python 3.11+** : Langage principal
@@ -12,6 +12,11 @@
 - **Flask** : Framework web pour interface MVC
 - **Jinja2** : Moteur de templates (inclus avec Flask)
 - **CSS natif** : Interface simplifiée sans framework externe
+
+### Ajouté pour Lab 3
+- **Flask-RESTX** : Extension Flask pour API REST
+- **Flask-CORS** : Support Cross-Origin Resource Sharing
+- **OpenAPI/Swagger** : Documentation API automatique
 
 ## Langage de programmation
 
@@ -44,7 +49,7 @@ Justification:
 
 ## Framework Web
 
-**Choix: Flask**
+**Choix: Flask + Flask-RESTX**
 
 Justification:
 - **Simplicité** : Framework léger et facile à apprendre
@@ -57,6 +62,25 @@ Justification:
 ### Extensions Flask utilisées
 - **Flask-SQLAlchemy** : Intégration avec l'ORM existant
 - **Jinja2** : Moteur de templates (inclus avec Flask)
+- **Flask-RESTX** : API REST avec documentation Swagger automatique
+- **Flask-CORS** : Support pour applications externes
+
+## API REST
+
+**Choix: Flask-RESTX**
+
+Justification:
+- **Cohérence architecturale** : Extension naturelle de Flask existant
+- **Documentation automatique** : Génération Swagger/OpenAPI intégrée
+- **Réutilisation de code** : Utilisation directe des services métier
+- **Standards RESTful** : Support HATEOAS, pagination, codes HTTP
+
+### Fonctionnalités implémentées
+- **4 cas d'usage principaux** : rapports consolidés, consultation stocks, performances magasins, gestion produits
+- **Authentification par token** : Sécurité simple et efficace
+- **Documentation interactive** : Interface Swagger à `/api/docs`
+- **Standards REST** : CRUD complet, pagination, filtrage
+- **Gestion d'erreurs** : Réponses structurées et codes HTTP appropriés
 
 ## Interface Utilisateur
 

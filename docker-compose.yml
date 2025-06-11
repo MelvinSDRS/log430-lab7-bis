@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Base de données PostgreSQL centralisée
   postgres:
@@ -156,6 +154,32 @@ services:
     networks:
       - pos-network
     restart: "no"
+
+  # API REST Service
+  api-rest:
+    build: .
+    container_name: pos-api-rest
+    command: python main.py
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
+      - APP_MODE=api
+      - FLASK_DEBUG=1
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5000
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pos-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Test service
   pos-test:

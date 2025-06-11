@@ -27,6 +27,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
@@ -46,6 +47,6 @@ USER appuser
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)"
+    CMD python -c "import requests; requests.get('http://localhost:8000/api/health') if __import__('os').getenv('APP_MODE') == 'api' else None; import sys; sys.exit(0)"
 
 CMD ["python", "main.py"] 

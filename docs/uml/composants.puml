@@ -5,6 +5,7 @@ package "Système POS Multi-Magasins" {
   package "Couche Présentation" {
     [Interface Console] as CONSOLE
     [Interface Web] as WEB
+    [API REST] as API
   }
   
   ' Logique métier centralisée
@@ -23,6 +24,7 @@ package "Système POS Multi-Magasins" {
 ' Relations
 CONSOLE --> SERVICES : Opérations
 WEB --> SERVICES : Supervision
+API --> SERVICES : Intégrations
 SERVICES --> ENTITIES
 SERVICES --> REPOS
 REPOS --> DB
@@ -36,6 +38,12 @@ end note
 note right of WEB
   UC3, UC8
   Tableau de bord
+end note
+
+note right of API
+  UC1, UC2, UC3, UC4
+  Applications externes
+  Documentation Swagger
 end note
 
 note right of SERVICES

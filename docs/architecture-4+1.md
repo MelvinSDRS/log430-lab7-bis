@@ -6,9 +6,9 @@ La vue logique représente les classes principales et leurs relations dans l'arc
 
 ### Diagramme de classes
 
-![Diagramme de Classes](uml/classes.png)
+![Diagramme de Classes](uml/images/classes.png)
 
-### Évolution du modèle (Lab 1 → Lab 2)
+### Évolution du modèle (Lab 1 → Lab 2 → Lab 3)
 
 **Nouvelles entités :**
 - **Magasin** : Représente un magasin de l'entreprise
@@ -34,7 +34,7 @@ La vue logique représente les classes principales et leurs relations dans l'arc
 - **ServiceApprovisionnement** : Gestion des demandes et transferts
 - **ServiceTableauBord** : Indicateurs de performance pour supervision web
 
-### Architecture Console + Web
+### Architecture 3-interfaces
 
 **Interface Console (Opérationnelle) :**
 - Réutilisation des services métier du Lab 1
@@ -46,34 +46,48 @@ La vue logique représente les classes principales et leurs relations dans l'arc
 - UC3 (tableau de bord) et UC8 (supervision légère)
 - Aucune fonctionnalité opérationnelle
 
+**Interface API REST (Intégrations) :**
+- Flask-RESTX avec documentation Swagger automatique
+- UC1-UC4 exposés via endpoints RESTful
+- Authentification Bearer token et CORS configuré
+- Standards REST avec HATEOAS et pagination
+
 ## Vue des processus
 
 ### Diagrammes de séquence
 
 #### UC1 - Génération de rapport consolidé (Console)
 
-![Diagramme de Séquence - Rapport](uml/sequence_rapport.png)
+![Diagramme de Séquence - Rapport](uml/images/sequence_rapport.png)
 
 #### UC3 - Tableau de bord supervision (Web)
 
-![Diagramme de Séquence - Tableau de Bord](uml/sequence_tableau_bord.png)
+![Diagramme de Séquence - Tableau de Bord](uml/images/sequence_tableau_bord.png)
 
 #### Processus de vente multi-magasins
 
-![Diagramme de Séquence - Vente](uml/sequence_vente.png)
+![Diagramme de Séquence - Vente](uml/images/sequence_vente.png)
 
 ### Processus principaux
 
 1. **Processus de vente en magasin** (hérité du Lab 1)
-2. **Processus de génération de rapports** (console maison mère)
+2. **Processus de génération de rapports** (console maison mère + API REST)
 3. **Processus de demande et validation d'approvisionnement** (console)
 4. **Processus de supervision via tableau de bord** (web)
+5. **Processus d'intégration externe via API** (applications tierces)
+
+### Nouveaux flux API REST
+
+- **Consultation asynchrone des stocks** via `GET /api/v1/stocks`
+- **Génération de rapports programmée** via `POST /api/v1/reports/sales/consolidated`
+- **Synchronisation des produits** via `PUT/DELETE /api/v1/products/{id}`
+- **Monitoring des performances** via `GET /api/v1/stores/performances`
 
 ## Vue de déploiement
 
 La vue de déploiement montre l'architecture 3-tier distribuée pour le système multi-magasins.
 
-![Diagramme de Déploiement](uml/deploiement.png)
+![Diagramme de Déploiement](uml/images/deploiement.png)
 
 ### Architecture 3-tier distribuée
 
@@ -92,8 +106,15 @@ La vue de déploiement montre l'architecture 3-tier distribuée pour le système
 **Tier 3 - Présentation :**
 - **Interface console** : Fonctionnalités opérationnelles (UC1, UC2, UC4, UC6 + POS Lab1)
 - **Interface web** : Supervision légère uniquement (UC3, UC8)
+- **API REST** : Intégrations externes (UC1-UC4 via endpoints RESTful)
 
 ### Entités déployées
+
+**API REST Server :**
+- Flask-RESTX sur port 8000
+- Documentation Swagger UI accessible via `/api/docs`
+- Authentification Bearer token
+- CORS configuré pour localhost:3000,5000
 
 **Magasins (5 instances) :**
 - Interface console pour ventes (Lab 1) + consultation stock central (UC2)
@@ -117,12 +138,13 @@ La vue de déploiement montre l'architecture 3-tier distribuée pour le système
 **Stratégies de cache :**
 - Cache des indicateurs de performance (rafraîchissement périodique)
 - Cache des données de référence (produits, entités)
+- Cache API pour réduire la charge sur les services métier
 
 ## Vue d'implémentation
 
 La vue d'implémentation montre l'organisation du code avec l'architecture MVC.
 
-![Diagramme de Composants](uml/composants.png)
+![Diagramme de Composants](uml/images/composants.png)
 
 ### Organisation des modules
 
@@ -142,21 +164,31 @@ La vue d'implémentation montre l'organisation du code avec l'architecture MVC.
 - `src/web/app.py` : Application Flask minimaliste (4 routes)
 - `src/web/templates/` : Templates HTML légers (index.html, dashboard.html)
 
+**Couche API REST :**
+- `src/api/app.py` : Application Flask-RESTX avec configuration Swagger
+- `src/api/endpoints/` : Endpoints REST organisés par domaine
+- `src/api/models.py` : Modèles de documentation Swagger/OpenAPI
+- `src/api/auth.py` : Système d'authentification Bearer token
+- `src/api/error_handlers.py` : Gestion standardisée des erreurs
+
 ### Qualité et observabilité
 
 **Tests :**
 - Tests unitaires pour les nouveaux services (`tests/test_services.py`)
+- Tests automatisés API REST (`tests/test_api_rest.py`)
 - Tests d'intégration pour les workflows multi-magasins
 - Tests de performance pour les requêtes critiques
 
 **Logging :**
 - Logs applicatifs dans `logs/pos_multimagasins.log`
 - Logs des services métier dans `logs/services.log`
+- Logs API REST dans `logs/pos_api.log`
 - Rotation automatique des fichiers de logs
 - Niveaux de log configurables (INFO, WARNING, ERROR)
 
 **Métriques :**
 - Métriques de performance des services
+- Métriques API REST (temps de réponse, codes d'erreur)
 - Indicateurs de santé du système
 - Alertes automatiques pour les situations critiques
 
@@ -166,7 +198,7 @@ La vue des cas d'utilisation décrit les scénarios du système multi-magasins.
 
 ### Cas d'utilisation principaux
 
-![Diagramme des Cas d'Utilisation](uml/cas_utilisation.png)
+![Diagramme des Cas d'Utilisation](uml/images/cas_utilisation.png)
 
 ### Acteurs et cas d'utilisation
 
@@ -183,6 +215,12 @@ La vue des cas d'utilisation décrit les scénarios du système multi-magasins.
 - Consulter tableau de bord (UC3) - Web
 - Supervision légère (UC8) - Web
 
+**Application Externe :**
+- Consulter rapports consolidés (UC1) - API REST
+- Consulter stocks par magasin (UC2) - API REST
+- Monitorer performances magasins (UC3) - API REST
+- Gérer produits programmatiquement (UC4) - API REST
+
 **Système :**
 - Maintenir cohérence des données
 - Calcul des indicateurs de performance
@@ -195,11 +233,17 @@ La vue des cas d'utilisation décrit les scénarios du système multi-magasins.
 - Gérer les retours
 - Consulter le stock local
 
-**Nouveaux pour Lab 2 :**
+**Maintenus du Lab 2 :**
 - UC1, UC2, UC4, UC6 : Fonctionnalités opérationnelles (console)
 - UC3, UC8 : Supervision légère (web)
 - Gestion multi-magasins
 - Séparation claire des responsabilités interfaces
+
+**Extension Lab 3 :**
+- UC1-UC4 : Exposition via API REST pour intégrations externes
+- Documentation interactive Swagger
+- Authentification sécurisée pour applications tierces
+- Standards RESTful avec pagination et HATEOAS
 
 ## Philosophie architecturale
 
@@ -216,6 +260,19 @@ La vue des cas d'utilisation décrit les scénarios du système multi-magasins.
 - **Utilisateurs** : Gestionnaires pour supervision rapide
 - **Fonctions** : UC3 (tableau de bord), UC8 (interface légère)
 - **Avantages** : Accès distant, visualisation simple, maintenance réduite
+
+**Interface API REST - Intégrations :**
+- **Responsabilité** : Intégrations externes et accès programmatique
+- **Utilisateurs** : Applications tierces, systèmes ERP, applications mobiles
+- **Fonctions** : UC1-UC4 via endpoints RESTful standardisés
+- **Avantages** : Standards REST, documentation automatique, authentification sécurisée
+
+### Principe de complémentarité
+
+Les trois interfaces sont **complémentaires** et non concurrentes :
+- **Console** : Interface principale pour les opérations quotidiennes
+- **Web** : Accès rapide pour supervision à distance
+- **API REST** : Pont vers l'écosystème externe sans perturbation interne
 
 ## Aspects non-fonctionnels
 
@@ -236,17 +293,20 @@ La vue des cas d'utilisation décrit les scénarios du système multi-magasins.
 **Logging structuré :**
 - Logs au format standardisé avec contexte
 - Corrélation des logs entre services
+- Logs API REST séparés pour analyse
 - Niveaux de log appropriés selon l'environnement
 
 **Métriques métier :**
 - Nombre de ventes par magasin
 - Temps de réponse des services critiques
+- Métriques API REST (appels, codes d'erreur)
 - Indicateurs de performance du tableau de bord
 
 **Monitoring :**
 - Santé des services métier
 - Performance des requêtes base de données
-- Disponibilité interfaces console et web
+- Disponibilité interfaces console, web et API REST
+- Health check API : `/api/health`
 
 ### Maintenabilité
 
@@ -257,5 +317,6 @@ La vue des cas d'utilisation décrit les scénarios du système multi-magasins.
 
 **Documentation :**
 - Documentation technique à jour
+- Documentation API interactive (Swagger UI)
 - Guides d'utilisation pour les interfaces
 - Procédures de déploiement et maintenance

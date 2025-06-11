@@ -4,9 +4,10 @@ Bienvenue dans la documentation du système de point de vente multi-magasins dé
 
 ## Évolution du système
 
-### Lab 1 → Lab 2
+### Lab 1 → Lab 2 → Lab 3
 - **Lab 1** : Architecture client/serveur 2-tier pour un magasin (3 caisses)
 - **Lab 2** : Architecture 3-tier multi-magasins avec interface web MVC
+- **Lab 3** : Extension avec API REST
 
 ## Structure de la documentation
 
@@ -22,6 +23,7 @@ Bienvenue dans la documentation du système de point de vente multi-magasins dé
 - [ADR 003: Séparation des Responsabilités](adr/003-separation-responsabilites.md)
 - [ADR 004: Architecture MVC pour Interface Web](adr/004-architecture-mvc.md)
 - [ADR 005: Framework Web Flask](adr/005-framework-flask.md)
+- [ADR 006: API REST avec Flask-RESTX](adr/006-api-rest-flask-restx.md)
 
 ### Technologies
 - [Choix Technologiques](choix-technologiques.md)

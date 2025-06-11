@@ -2,13 +2,13 @@
 
 ## Description
 
-Système de point de vente (POS) **multi-magasins** avec **architecture 3-tier** évoluée. Le système gère maintenant **5 magasins + 1 centre logistique + 1 maison mère** avec interface web de supervision en plus de l'interface console pour les caisses.
+Système de point de vente (POS) **multi-magasins** avec **architecture 3-tier** évoluée. Le système gère **5 magasins + 1 centre logistique + 1 maison mère** avec interface web de supervision, interface console pour les caisses, et API REST pour applications externes.
 
 ## Architecture 3-Tier
 
 - **Tier 1 (Persistance)** : Base de données PostgreSQL centralisée
 - **Tier 2 (Logique Métier)** : Services d'approvisionnement, rapports consolidés, tableau de bord
-- **Tier 3 (Présentation)** : Interface console (opérations) + Interface web (supervision)
+- **Tier 3 (Présentation)** : Interface console (opérations) + Interface web (supervision) + API REST (intégrations)
 
 ## Entités du Système
 
@@ -16,12 +16,13 @@ Système de point de vente (POS) **multi-magasins** avec **architecture 3-tier**
 - **1 Centre Logistique** : Distribution et gestion des stocks
 - **1 Maison Mère** : Supervision et rapports consolidés
 
-## Architecture Console + Web
+## Architecture Multi-Interface
 
 Le système respecte une **séparation claire des responsabilités** :
 
 - **Interface Console** : Toutes les opérations métier (ventes, rapports, gestion produits, approvisionnements)
 - **Interface Web** : Supervision légère uniquement (tableau de bord, monitoring)
+- **API REST** : Exposition des fonctionnalités pour applications externes
 
 Cette séparation garantit des performances optimales et une maintenance facilitée.
 
@@ -44,6 +45,12 @@ Cette séparation garantit des performances optimales et une maintenance facilit
 - **Supervision** : Vue d'ensemble des magasins et alertes
 - **Interface minimaliste** : Focus sur la supervision, pas les opérations
 
+### API REST (Intégrations)
+- **4 cas d'usage principaux** : Rapports consolidés, consultation stocks, performances, gestion produits
+- **Documentation Swagger** : Interface interactive à `http://localhost:8000/api/docs`
+- **Authentification token** : Sécurité pour applications externes
+- **Standards RESTful** : HATEOAS, pagination, codes HTTP appropriés
+
 ## Démarrage Rapide
 
 ### Prérequis
@@ -53,11 +60,15 @@ Cette séparation garantit des performances optimales et une maintenance facilit
 ### Lancement (Une seule commande)
 
 ```bash
-# Démarrer l'architecture complète (serveur + interface web + données multi-magasins)
+# Démarrer l'architecture complète (serveur + interface web + API REST + données multi-magasins)
 docker compose up -d
 
 # Accéder à l'interface web de supervision
 http://localhost:5000
+
+# Accéder à l'API REST et sa documentation
+http://localhost:8000/api/docs        # Documentation Swagger interactive
+http://localhost:8000/api/v1/         # API REST (nécessite token: pos-api-token-2025)
 
 # Accéder aux interfaces console des magasins (5 magasins disponibles)
 docker compose exec pos-magasin-1 python main.py  # Magasin 1 - Vieux-Montréal
@@ -73,9 +84,10 @@ Le système démarre complètement automatiquement :
 1. PostgreSQL démarre et devient healthy
 2. Base de données initialisée avec 7 entités et données de démonstration
 3. Interface web Flask démarre sur le port 5000
-4. Clients console disponibles pour chaque magasin
-5. Services prêts : Interface web (supervision) + Interface console (opérations)
-6. Aucune intervention manuelle requise
+4. API REST Flask-RESTX démarre sur le port 8000
+5. Clients console disponibles pour chaque magasin
+6. Services prêts : Interface web (supervision) + Interface console (opérations) + API REST (intégrations)
+7. Aucune intervention manuelle requise
 
 ## Utilisation
 
@@ -86,6 +98,19 @@ Accédez à `http://localhost:5000` pour :
 2. **Supervision** : Monitoring en temps réel des indicateurs clés
 
 **Note** : Les opérations (rapports, gestion produits, approvisionnements) se font via l'interface console.
+
+### API REST (Intégrations)
+
+Accédez à `http://localhost:8000/api/docs` pour :
+1. **Documentation interactive Swagger** : Tester l'API directement
+2. **Authentification** : Utiliser le token `pos-api-token-2025`
+3. **4 cas d'usage** : Rapports, Stocks, Performances, Produits
+
+**Endpoints principaux** :
+- `GET /api/v1/reports/consolidated-sales` : Rapports de ventes consolidés
+- `GET /api/v1/stocks?store_id=X` : Consultation des stocks par magasin
+- `GET /api/v1/stores/performances` : Performances globales des magasins
+- `GET/POST/PUT/DELETE /api/v1/products` : Gestion complète des produits
 
 ### Interface Console (Magasins)
 
@@ -138,6 +163,7 @@ docker compose ps
 - **SQLAlchemy** : ORM pour l'abstraction de la persistance
 - **Rich** : Interface console améliorée
 - **Flask** : Framework web pour l'interface de supervision
+- **Flask-RESTX** : Extension Flask pour API REST avec documentation Swagger
 - **Docker** : Conteneurisation et déploiement
 
 ## Structure du Projet
@@ -145,6 +171,7 @@ docker compose ps
 ```
 .
 ├── src/
+│   ├── api/              # API REST
 │   ├── client/           # Interface console (caisses)
 │   ├── domain/           # Logique métier
 │   └── persistence/      # Accès aux données

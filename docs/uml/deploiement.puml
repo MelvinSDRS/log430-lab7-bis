@@ -17,6 +17,11 @@ node "Services Métier" {
 }
 
 ' Tier 3 - Interfaces utilisateur (présentation)
+' API REST pour applications externes
+node "API REST Server" {
+  component "Flask-RESTX\n:8000\nSwagger UI" as API
+}
+
 ' Magasins avec interface console
 node "Magasin 1" {
   component "Console POS\nCaisse 1-3" as M1
@@ -47,6 +52,12 @@ node "Centre Logistique" {
 node "Maison Mère" {
   component "Interface Web\nRapports & Admin" as MM
 }
+
+' Connexions API REST → Tier 2
+API --> SP
+API --> SV
+API --> SA
+API --> SR
 
 ' Connexions Tier 3 → Tier 2
 M1 --> SP
@@ -80,9 +91,10 @@ note bottom
   Architecture 3-Tier Multi-Magasins:
   - Tier 1: PostgreSQL centralisé
   - Tier 2: Services métier partagés
-  - Tier 3: Interface console (opérationnel) + web (supervision)
+  - Tier 3: Console (opérationnel) + Web (supervision) + API REST (intégrations)
   
   Entités: 5 magasins + 1 centre logistique + 1 maison mère
+  API: Bearer token, CORS, documentation Swagger
 end note
 
 @enduml

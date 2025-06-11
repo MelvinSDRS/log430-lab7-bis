@@ -4,6 +4,7 @@ left to right direction
 actor "Employé Magasin" as EM
 actor "Responsable Logistique" as RL
 actor "Gestionnaire Maison Mère" as GM
+actor "Application Externe" as AE
 
 rectangle "Système POS Multi-Magasins" {
   
@@ -14,15 +15,22 @@ rectangle "Système POS Multi-Magasins" {
     (Gérer les retours) as UC_RETOUR
     
     ' UC Lab 2 - Console
-    (UC1: Générer rapports) as UC1
+    (UC1: Générer rapports) as UC1_CONSOLE
     (UC2: Consulter stock central) as UC2
-    (UC4: Gérer produits) as UC4
+    (UC4: Gérer produits) as UC4_CONSOLE
     (UC6: Traiter approvisionnement) as UC6
   }
   
   rectangle "Interface Web (Supervision)" as WEB {
-    (UC3: Tableau de bord) as UC3
+    (UC3: Tableau de bord) as UC3_WEB
     (UC8: Supervision légère) as UC8
+  }
+  
+  rectangle "Interface API REST (Intégrations)" as API {
+    (UC1: Rapports consolidés) as UC1_API
+    (UC2: Consultation stocks) as UC2_API
+    (UC3: Performances magasins) as UC3_API
+    (UC4: Gestion produits) as UC4_API
   }
   
   ' Relations Console
@@ -33,12 +41,18 @@ rectangle "Système POS Multi-Magasins" {
   
   RL -- UC6
   
-  GM -- UC1
-  GM -- UC4
+  GM -- UC1_CONSOLE
+  GM -- UC4_CONSOLE
   
   ' Relations Web
-  GM -- UC3
+  GM -- UC3_WEB
   GM -- UC8
+  
+  ' Relations API REST
+  AE -- UC1_API
+  AE -- UC2_API
+  AE -- UC3_API
+  AE -- UC4_API
 }
 
 note right of CONSOLE
@@ -49,6 +63,12 @@ end note
 note right of WEB
   Supervision à distance
   Interface légère
+end note
+
+note right of API
+  Documentation Swagger
+  Authentification Bearer token
+  Standards RESTful + HATEOAS
 end note
 
 @enduml

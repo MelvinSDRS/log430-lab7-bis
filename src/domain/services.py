@@ -358,7 +358,7 @@ class ServiceRapport:
             rapport = Rapport(
                 id=None,
                 titre=f"Rapport consolidé des ventes ({date_debut.strftime('%Y-%m-%d')} - {date_fin.strftime('%Y-%m-%d')})",
-                type_rapport="VENTES",
+                type_rapport="VENTES_CONSOLIDE",
                 date_generation=datetime.now(),
                 date_debut=date_debut,
                 date_fin=date_fin,
@@ -406,10 +406,23 @@ class ServiceRapport:
                 for stock in stocks_en_rupture:
                     donnees_rapport["alertes_rupture"].append({
                         "entite": entite.nom,
-                        "produit": stock.produit.nom,
+                        "produit": stock.produit.nom if stock.produit else f"Produit {stock.id_produit}",
                         "stock_actuel": stock.quantite,
                         "seuil_alerte": stock.seuil_alerte
                     })
+
+            # Formater les alertes en rupture  
+            alertes_rupture = [{
+                'magasin_id': stock.id_entite,
+                'magasin_nom': stock.entite.nom if stock.entite else f"Magasin {stock.id_entite}",
+                'produit_id': stock.id_produit,
+                'produit_nom': stock.produit.nom if stock.produit else f"Produit {stock.id_produit}",
+                'quantite_actuelle': stock.quantite,
+                'seuil_alerte': stock.seuil_alerte,
+                'niveau_critique': 'RUPTURE' if stock.quantite == 0 else 'FAIBLE'
+            } for stock in stocks_en_rupture]
+
+            donnees_rapport["alertes_rupture"] = alertes_rupture
 
             rapport = Rapport(
                 id=None,
@@ -498,10 +511,10 @@ class ServiceTableauBord:
                 alerte = {
                     "type": "RUPTURE_CRITIQUE",
                     "niveau": "URGENT",
-                    "message": f"Rupture critique: {rupture.produit_nom} dans {rupture.entite_nom}",
-                    "entite_id": rupture.entite_id,
-                    "produit_id": rupture.produit_id,
-                    "date_detection": datetime.now()
+                    "message": f"Rupture critique: {rupture.produit.nom if rupture.produit else f'Produit {rupture.id_produit}'} dans {rupture.entite.nom if rupture.entite else f'Entité {rupture.id_entite}'}",
+                    "entite_id": rupture.id_entite,
+                    "produit_id": rupture.id_produit,
+                    "date_detection": datetime.now().isoformat()
                 }
                 alertes.append(alerte)
             

@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from decimal import Decimal
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -49,6 +49,41 @@ class RepositoryProduit:
         models = self.session.query(ProduitModel).all()
         return [self._model_to_entity(model) for model in models]
 
+    def creer(self, donnees: Dict[str, Any]) -> Produit:
+        """Créer un nouveau produit"""
+        produit_model = ProduitModel(
+            nom=donnees['nom'],
+            prix=donnees['prix'],
+            stock=donnees['stock'],
+            id_categorie=donnees['id_categorie'],
+            seuil_alerte=donnees.get('seuil_alerte', 5),
+            description=donnees.get('description')
+        )
+        self.session.add(produit_model)
+        self.session.flush()
+        return self._model_to_entity(produit_model)
+
+    def mettre_a_jour(self, produit_id: int, donnees: Dict[str, Any]) -> Optional[Produit]:
+        """Mettre à jour un produit existant"""
+        produit_model = self.session.query(ProduitModel).filter(
+            ProduitModel.id == produit_id).first()
+        
+        if not produit_model:
+            return None
+        
+        for key, value in donnees.items():
+            if hasattr(produit_model, key):
+                setattr(produit_model, key, value)
+        
+        self.session.flush()
+        return self._model_to_entity(produit_model)
+
+    def supprimer(self, produit_id: int) -> bool:
+        """Supprimer un produit"""
+        result = self.session.query(ProduitModel).filter(
+            ProduitModel.id == produit_id).delete()
+        return result > 0
+
     def _model_to_entity(self, model: ProduitModel) -> Produit:
         categorie = None
         if model.categorie:
@@ -94,6 +129,10 @@ class RepositoryEntite:
             EntiteModel.type_entite == TypeEntiteEnum.MAISON_MERE).first()
         return self._model_to_entity(model) if model else None
 
+    def lister_toutes(self) -> List[Entite]:
+        models = self.session.query(EntiteModel).all()
+        return [self._model_to_entity(model) for model in models]
+
     def _model_to_entity(self, model: EntiteModel) -> Entite:
         return Entite(
             id=model.id,
@@ -129,6 +168,17 @@ class RepositoryStockEntite:
         models = self.session.query(StockEntiteModel).filter(
             and_(StockEntiteModel.id_entite == id_entite,
                  StockEntiteModel.quantite > seuil_surstock)).all()
+        return [self._model_to_entity(model) for model in models]
+
+    def lister_tous(self) -> List[StockEntite]:
+        models = self.session.query(StockEntiteModel).all()
+        return [self._model_to_entity(model) for model in models]
+
+    def obtenir_ruptures_critiques(self) -> List[StockEntite]:
+        """Obtenir tous les stocks en rupture critique (quantité <= seuil d'alerte)"""
+        models = self.session.query(StockEntiteModel).filter(
+            StockEntiteModel.quantite <= StockEntiteModel.seuil_alerte
+        ).all()
         return [self._model_to_entity(model) for model in models]
 
     def mettre_a_jour_quantite(self, stock_id: int, nouvelle_quantite: int):
@@ -409,6 +459,15 @@ class RepositoryRapport:
         model = self.session.query(RapportModel).filter(
             RapportModel.id == rapport_id).first()
         return self._model_to_entity(model) if model else None
+
+    def lister_tous(self) -> List[Rapport]:
+        models = self.session.query(RapportModel).order_by(RapportModel.date_generation.desc()).all()
+        return [self._model_to_entity(model) for model in models]
+
+    def supprimer(self, rapport_id: int) -> bool:
+        result = self.session.query(RapportModel).filter(
+            RapportModel.id == rapport_id).delete()
+        return result > 0
 
     def _model_to_entity(self, model: RapportModel) -> Rapport:
         return Rapport(
