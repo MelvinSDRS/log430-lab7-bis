@@ -130,11 +130,12 @@ Exposition des fonctionnalités via API REST pour applications externes :
 - **UC2** - Consultation stocks via `GET /api/v1/stocks?store_id=X`
 - **UC3** - Performances magasins via `GET /api/v1/stores/performances`
 - **UC4** - Gestion produits via `GET/POST/PUT/DELETE /api/v1/products`
+- Architecture DDD pour logique métier structurée
 - Documentation interactive via Swagger UI (`/api/docs`)
 - Authentification Bearer token sécurisée
 
 ### Justification de cette répartition
-Cette approche respecte l'esprit du sujet original où l'interface web était destinée à être **légère** et **complémentaire**. L'API REST ajoute une troisième dimension pour les intégrations externes sans impacter les interfaces existantes.
+Cette approche respecte l'esprit du sujet original où l'interface web était destinée à être **légère** et **complémentaire**. L'API REST ajoute une troisième dimension pour les intégrations externes avec une architecture métier structurée sans impacter les interfaces existantes.
 
 ## Contraintes
 
@@ -142,7 +143,7 @@ Cette approche respecte l'esprit du sujet original où l'interface web était de
 - Architecture 3-tier avec couche de services centralisés
 - Interface web MVC simplifiée avec Flask (UC3 + UC8 uniquement)
 - Interface console étendue pour fonctionnalités opérationnelles
-- API REST Flask-RESTX avec documentation Swagger automatique
+- API REST Flask-RESTX avec architecture DDD et documentation Swagger automatique
 - Utilisation d'un ORM (SQLAlchemy) pour l'abstraction de persistance
 - Synchronisation des données entre entités distribuées
 
@@ -150,7 +151,7 @@ Cette approche respecte l'esprit du sujet original où l'interface web était de
 - Continuité avec le système Lab 1 existant (réutilisation des services)
 - Interface console enrichie selon le type d'entité (magasin/maison mère/centre logistique)
 - Interface web légère pour supervision à distance uniquement
-- API REST pour intégrations externes avec applications tierces
+- API REST pour intégrations externes avec architecture métier structurée
 - Séparation claire des responsabilités entre console (opérations), web (supervision) et API (intégrations)
 
 ### Environnement ✅

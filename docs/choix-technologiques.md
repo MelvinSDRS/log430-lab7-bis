@@ -67,12 +67,12 @@ Justification:
 
 ## API REST
 
-**Choix: Flask-RESTX**
+**Choix: Flask-RESTX avec architecture DDD**
 
 Justification:
 - **Cohérence architecturale** : Extension naturelle de Flask existant
 - **Documentation automatique** : Génération Swagger/OpenAPI intégrée
-- **Réutilisation de code** : Utilisation directe des services métier
+- **Architecture métier structurée** : DDD pour organiser la logique métier de l'API
 - **Standards RESTful** : Support HATEOAS, pagination, codes HTTP
 
 ### Fonctionnalités implémentées
@@ -80,6 +80,7 @@ Justification:
 - **Authentification par token** : Sécurité simple et efficace
 - **Documentation interactive** : Interface Swagger à `/api/docs`
 - **Standards REST** : CRUD complet, pagination, filtrage
+- **Architecture DDD** : Value Objects, Aggregates et Domain Services pour Product Catalog
 - **Gestion d'erreurs** : Réponses structurées et codes HTTP appropriés
 
 ## Interface Utilisateur

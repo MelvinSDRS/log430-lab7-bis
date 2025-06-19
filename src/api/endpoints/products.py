@@ -6,9 +6,10 @@ UC4 - Mettre à jour les informations d'un produit
 from flask import request
 from flask_restx import Namespace, Resource, fields
 from ...persistence.database import get_db_session
-from ...persistence.repositories import RepositoryProduit
 from ..auth import auth_token
 from ..models import product_model, product_create_model, product_update_model, error_model
+from ..bounded_contexts.product_catalog.application.product_application_service import ProductApplicationService
+from ..bounded_contexts.product_catalog.infrastructure.product_repository_adapter import ProductRepositoryAdapter
 import logging
 from werkzeug.exceptions import NotFound
 
@@ -53,48 +54,28 @@ class ProductListResource(Resource):
         category = request.args.get('category', type=int)
         
         sort = request.args.get('sort', 'nom,asc')
+        sort_field, sort_order = sort.split(',') if ',' in sort else (sort, 'asc')
         
         session = get_db_session()
         try:
-            repo_produit = RepositoryProduit(session)
+            product_repo = ProductRepositoryAdapter(session)
+            product_service = ProductApplicationService(product_repo)
             
-            if search:
-                produits = repo_produit.rechercher('nom', search)
-                total = len(produits)
-                start = (page - 1) * per_page
-                end = start + per_page
-                produits_page = produits[start:end]
-            else:
-                tous_produits = repo_produit.lister_tous()
-                if category:
-                    tous_produits = [p for p in tous_produits if p.id_categorie == category]
-                
-                if sort:
-                    sort_field, sort_order = sort.split(',') if ',' in sort else (sort, 'asc')
-                    reverse = sort_order.lower() == 'desc'
-                    if sort_field == 'nom':
-                        tous_produits.sort(key=lambda x: x.nom, reverse=reverse)
-                    elif sort_field == 'prix':
-                        tous_produits.sort(key=lambda x: float(x.prix), reverse=reverse)
-                
-                total = len(tous_produits)
-                start = (page - 1) * per_page
-                end = start + per_page
-                produits_page = tous_produits[start:end]
+            search_term = search if search else None
+            tous_produits = product_service.list_products(
+                search=search_term,
+                category_id=category,
+                sort_field=sort_field,
+                sort_order=sort_order
+            )
             
-            produits_data = []
-            for produit in produits_page:
-                produits_data.append({
-                    'id': produit.id,
-                    'nom': produit.nom,
-                    'prix': float(produit.prix),
-                    'stock': produit.stock,
-                    'id_categorie': produit.id_categorie,
-                    'seuil_alerte': produit.seuil_alerte,
-                    'description': produit.description
-                })
+            # Pagination (reste au niveau API)
+            total = len(tous_produits)
+            start = (page - 1) * per_page
+            end = start + per_page
+            produits_page = tous_produits[start:end]
             
-            pages = (total + per_page - 1) // per_page
+            pages = (total + per_page - 1) // per_page if total > 0 else 1
             has_prev = page > 1
             has_next = page < pages
             
@@ -110,7 +91,7 @@ class ProductListResource(Resource):
                 links['next'] = f'/api/v1/products?page={page+1}&per_page={per_page}'
             
             response = {
-                'data': produits_data,
+                'data': produits_page,
                 'meta': {
                     'page': page,
                     'per_page': per_page,
@@ -152,30 +133,22 @@ class ProductListResource(Resource):
         
         session = get_db_session()
         try:
-            repo_produit = RepositoryProduit(session)
+            product_repo = ProductRepositoryAdapter(session)
+            product_service = ProductApplicationService(product_repo)
             
-            # Créer le produit
-            nouveau_produit = repo_produit.creer({
+            # Préparation des données
+            product_data = {
                 'nom': data['nom'],
                 'prix': data['prix'],
                 'stock': data['stock'],
                 'id_categorie': data['id_categorie'],
                 'seuil_alerte': data.get('seuil_alerte', 5),
                 'description': data.get('description')
-            })
-            session.commit()
-            
-            response = {
-                'id': nouveau_produit.id,
-                'nom': nouveau_produit.nom,
-                'prix': float(nouveau_produit.prix),
-                'stock': nouveau_produit.stock,
-                'id_categorie': nouveau_produit.id_categorie,
-                'seuil_alerte': nouveau_produit.seuil_alerte,
-                'description': nouveau_produit.description
             }
             
-            logger.info(f"Produit créé - ID: {nouveau_produit.id}, Nom: {nouveau_produit.nom}")
+            response = product_service.create_product(product_data)
+            
+            logger.info(f"Produit créé - ID: {response['id']}, Nom: {response['nom']}")
             return response, 201
             
         except Exception as e:
@@ -201,21 +174,13 @@ class ProductResource(Resource):
         """
         session = get_db_session()
         try:
-            repo_produit = RepositoryProduit(session)
-            produit = repo_produit.obtenir_par_id(product_id)
+            product_repo = ProductRepositoryAdapter(session)
+            product_service = ProductApplicationService(product_repo)
             
-            if not produit:
+            response = product_service.get_product_by_id(product_id)
+            
+            if not response:
                 raise NotFound(description=f'Produit avec l\'ID {product_id} introuvable')
-            
-            response = {
-                'id': produit.id,
-                'nom': produit.nom,
-                'prix': float(produit.prix),
-                'stock': produit.stock,
-                'id_categorie': produit.id_categorie,
-                'seuil_alerte': produit.seuil_alerte,
-                'description': produit.description
-            }
             
             logger.info(f"Produit récupéré - ID: {product_id}")
             return response
@@ -242,44 +207,25 @@ class ProductResource(Resource):
         
         session = get_db_session()
         try:
-            repo_produit = RepositoryProduit(session)
-            produit = repo_produit.obtenir_par_id(product_id)
+            product_repo = ProductRepositoryAdapter(session)
+            product_service = ProductApplicationService(product_repo)
             
-            if not produit:
-                raise NotFound(description=f'Produit avec l\'ID {product_id} introuvable')
-            
+            # Préparer les données de mise à jour
             updates = {}
-            allowed_fields = ['nom', 'prix', 'seuil_alerte', 'description']
+            allowed_fields = ['nom', 'prix', 'stock', 'id_categorie', 'seuil_alerte', 'description']
             for field in allowed_fields:
                 if field in data:
                     updates[field] = data[field]
             
             if updates:
-                produit_mis_a_jour = repo_produit.mettre_a_jour(product_id, updates)
-                session.commit()
-                
-                response = {
-                    'id': produit_mis_a_jour.id,
-                    'nom': produit_mis_a_jour.nom,
-                    'prix': float(produit_mis_a_jour.prix),
-                    'stock': produit_mis_a_jour.stock,
-                    'id_categorie': produit_mis_a_jour.id_categorie,
-                    'seuil_alerte': produit_mis_a_jour.seuil_alerte,
-                    'description': produit_mis_a_jour.description
-                }
-                
+                response = product_service.update_product(product_id, updates)
                 logger.info(f"Produit mis à jour - ID: {product_id}, Champs: {list(updates.keys())}")
                 return response
             else:
-                response = {
-                    'id': produit.id,
-                    'nom': produit.nom,
-                    'prix': float(produit.prix),
-                    'stock': produit.stock,
-                    'id_categorie': produit.id_categorie,
-                    'seuil_alerte': produit.seuil_alerte,
-                    'description': produit.description
-                }
+                # Si aucune mise à jour, retourner le produit actuel
+                response = product_service.get_product_by_id(product_id)
+                if not response:
+                    raise NotFound(description=f'Produit avec l\'ID {product_id} introuvable')
                 return response
             
         except Exception as e:
@@ -299,14 +245,13 @@ class ProductResource(Resource):
         """
         session = get_db_session()
         try:
-            repo_produit = RepositoryProduit(session)
-            produit = repo_produit.obtenir_par_id(product_id)
+            product_repo = ProductRepositoryAdapter(session)
+            product_service = ProductApplicationService(product_repo)
             
-            if not produit:
+            success = product_service.delete_product(product_id)
+            
+            if not success:
                 raise NotFound(description=f'Produit avec l\'ID {product_id} introuvable')
-            
-            repo_produit.supprimer(product_id)
-            session.commit()
             
             logger.info(f"Produit supprimé - ID: {product_id}")
             return '', 204

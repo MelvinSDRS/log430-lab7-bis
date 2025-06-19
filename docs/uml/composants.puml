@@ -5,51 +5,89 @@ package "Système POS Multi-Magasins" {
   package "Couche Présentation" {
     [Interface Console] as CONSOLE
     [Interface Web] as WEB
-    [API REST] as API
+    
+    package "API REST (DDD)" as API_PKG {
+      [Endpoints REST] as ENDPOINTS
+      [Application Services] as APP_SERVICES
+      package "Bounded Contexts" {
+        [Product Catalog] as PRODUCT_BC
+        [Shared Kernel] as SHARED_BC
+      }
+    }
   }
   
-  ' Logique métier centralisée
+  ' Logique métier
   package "Couche Métier" {
-    [Services Métier] as SERVICES
-    [Entités Domaine] as ENTITIES
+    [Services Métier Legacy] as SERVICES
+    [Entités Domaine Legacy] as ENTITIES
+    
+    package "DDD Components" {
+      [Value Objects] as VALUE_OBJECTS
+      [Aggregates] as AGGREGATES
+      [Domain Services] as DOMAIN_SERVICES
+      [Domain Events] as DOMAIN_EVENTS
+    }
   }
   
   ' Persistance
   package "Couche Données" {
-    [Repositories] as REPOS
+    [Repositories Legacy] as REPOS
+    [Repository Adapters] as ADAPTERS
     [Base PostgreSQL] as DB
   }
 }
 
-' Relations
+' Relations Legacy (Console + Web)
 CONSOLE --> SERVICES : Opérations
 WEB --> SERVICES : Supervision
-API --> SERVICES : Intégrations
 SERVICES --> ENTITIES
 SERVICES --> REPOS
 REPOS --> DB
+
+' Relations API REST (DDD)
+ENDPOINTS --> APP_SERVICES
+APP_SERVICES --> PRODUCT_BC
+APP_SERVICES --> SHARED_BC
+PRODUCT_BC --> AGGREGATES
+PRODUCT_BC --> VALUE_OBJECTS
+PRODUCT_BC --> DOMAIN_SERVICES
+SHARED_BC --> VALUE_OBJECTS
+SHARED_BC --> DOMAIN_EVENTS
+AGGREGATES --> ADAPTERS
+ADAPTERS --> DB
 
 ' Annotations
 note right of CONSOLE
   UC1, UC2, UC4, UC6
   + Fonctions POS Lab1
+  Architecture legacy
 end note
 
 note right of WEB
   UC3, UC8
   Tableau de bord
+  Architecture legacy
 end note
 
-note right of API
+note right of API_PKG
   UC1, UC2, UC3, UC4
   Applications externes
+  Architecture DDD
   Documentation Swagger
 end note
 
 note right of SERVICES
   ServiceVente
-  ServiceApprovisionnement
+  ServiceApprovisionnement  
   ServiceTableauBord
+  (Legacy)
+end note
+
+note right of PRODUCT_BC
+  Aggregate Product
+  Value Objects métier
+  Domain Services
+  Domain Events
 end note
 
 @enduml

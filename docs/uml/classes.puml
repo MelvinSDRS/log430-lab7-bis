@@ -68,6 +68,74 @@ class ServiceTableauBord {
   +calculer_indicateurs(): IndicateurPerformance
 }
 
+' Architecture DDD pour API
+package "API Bounded Contexts" {
+  
+  ' Shared Value Objects
+  class Money <<value object>> {
+    +amount: Decimal
+    +currency: string
+    +is_positive(): bool
+    +add(other: Money): Money
+  }
+  
+  class EntityId <<value object>> {
+    +value: int
+    +is_valid(): bool
+  }
+  
+  ' Product Catalog Bounded Context
+  package "Product Catalog" {
+    
+    ' Value Objects
+    class ProductId <<value object>> {
+      +value: int
+      +is_valid(): bool
+    }
+    
+    class ProductName <<value object>> {
+      +value: string
+      +is_valid(): bool
+    }
+    
+    class StockQuantity <<value object>> {
+      +value: int
+      +is_sufficient(needed: int): bool
+    }
+    
+    ' Aggregate Root
+    class Product <<aggregate root>> {
+      -id: ProductId
+      -name: ProductName
+      -price: Money
+      -stock: StockQuantity
+      +update_name(name: ProductName): void
+      +update_price(price: Money): void
+      +is_stock_below_threshold(): bool
+      +get_domain_events(): DomainEvent[]
+    }
+    
+    ' Domain Events
+    class ProductCreatedEvent <<domain event>> {
+      +product_id: ProductId
+      +occurred_at: datetime
+    }
+    
+    ' Domain Service
+    class ProductDomainService {
+      +ensure_name_uniqueness(): bool
+      +find_products_needing_replenishment(): Product[]
+    }
+    
+    ' Repository Interface
+    interface IProductRepository {
+      +find_by_id(id: ProductId): Product
+      +save(product: Product): void
+      +find_all(): Product[]
+    }
+  }
+}
+
 ' Relations principales
 Produit "1" -- "*" StockEntite
 Produit "1" -- "*" LigneVente
@@ -86,5 +154,26 @@ StatutDemande -- DemandeApprovisionnement
 ServiceVente ..> Vente : crée
 ServiceApprovisionnement ..> DemandeApprovisionnement : gère
 ServiceTableauBord ..> Vente : analyse
+
+' Relations DDD
+Product *-- ProductId
+Product *-- ProductName
+Product *-- Money
+Product *-- StockQuantity
+Product ..> ProductCreatedEvent : émet
+ProductDomainService ..> Product : gère
+IProductRepository ..> Product : persiste
+
+note top of "API Bounded Contexts"
+  Architecture DDD pour API REST
+  Value Objects avec validation
+  Aggregates avec logique métier
+  Domain Events pour découplage
+end note
+
+note bottom of Produit
+  Entités legacy utilisées par
+  Console et Web
+end note
 
 @enduml

@@ -5,7 +5,7 @@ Implémentation simple avec token statique
 
 import os
 from functools import wraps
-from flask import request, jsonify, current_app
+from flask import request, current_app
 from datetime import datetime
 import logging
 
@@ -30,33 +30,33 @@ def auth_token(f):
                 token = auth_header.split(" ")[1]
             except IndexError:
                 logger.warning(f"Format d'authentification invalide: {auth_header}")
-                return jsonify({
+                return {
                     'timestamp': datetime.now().isoformat() + 'Z',
                     'status': 401,
                     'error': 'Unauthorized',
                     'message': 'Format d\'authentification invalide. Utilisez: Bearer TOKEN',
                     'path': request.path
-                }), 401
+                }, 401
         
         if not token:
             logger.warning(f"Tentative d'accès non autorisée à {request.path}")
-            return jsonify({
+            return {
                 'timestamp': datetime.now().isoformat() + 'Z',
                 'status': 401,
                 'error': 'Unauthorized',
                 'message': 'Token d\'authentification requis',
                 'path': request.path
-            }), 401
+            }, 401
         
         if token != API_TOKEN:
             logger.warning(f"Token invalide utilisé pour accéder à {request.path}")
-            return jsonify({
+            return {
                 'timestamp': datetime.now().isoformat() + 'Z',
                 'status': 401,
                 'error': 'Unauthorized',
                 'message': 'Token d\'authentification invalide',
                 'path': request.path
-            }), 401
+            }, 401
         
         logger.info(f"Accès autorisé à {request.path}")
         return f(*args, **kwargs)

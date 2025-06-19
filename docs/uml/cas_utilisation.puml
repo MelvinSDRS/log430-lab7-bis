@@ -66,6 +66,7 @@ note right of WEB
 end note
 
 note right of API
+  Architecture DDD
   Documentation Swagger
   Authentification Bearer token
   Standards RESTful + HATEOAS

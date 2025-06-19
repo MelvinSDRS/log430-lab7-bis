@@ -1,0 +1,1 @@
+# Shared Kernel - Éléments partagés entre bounded contexts 

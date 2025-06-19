@@ -48,6 +48,7 @@ La vue logique représente les classes principales et leurs relations dans l'arc
 
 **Interface API REST (Intégrations) :**
 - Flask-RESTX avec documentation Swagger automatique
+- Architecture Domain-Driven pour organisation métier structurée
 - UC1-UC4 exposés via endpoints RESTful
 - Authentification Bearer token et CORS configuré
 - Standards REST avec HATEOAS et pagination
@@ -115,6 +116,7 @@ La vue de déploiement montre l'architecture 3-tier distribuée pour le système
 - Documentation Swagger UI accessible via `/api/docs`
 - Authentification Bearer token
 - CORS configuré pour localhost:3000,5000
+- Bounded contexts pour organisation métier structurée
 
 **Magasins (5 instances) :**
 - Interface console pour ventes (Lab 1) + consultation stock central (UC2)
@@ -167,6 +169,9 @@ La vue d'implémentation montre l'organisation du code avec l'architecture MVC.
 **Couche API REST :**
 - `src/api/app.py` : Application Flask-RESTX avec configuration Swagger
 - `src/api/endpoints/` : Endpoints REST organisés par domaine
+- `src/api/bounded_contexts/` : Architecture Domain-Driven pour l'API
+  - `product_catalog/` : Bounded context avec Aggregates, Value Objects et Domain Services
+  - `shared/` : Value Objects et Domain Events partagés
 - `src/api/models.py` : Modèles de documentation Swagger/OpenAPI
 - `src/api/auth.py` : Système d'authentification Bearer token
 - `src/api/error_handlers.py` : Gestion standardisée des erreurs
