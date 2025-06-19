@@ -365,11 +365,26 @@ class TestServiceTableauBord:
         service = ServiceTableauBord(session_mock)
         service.repo_stock = Mock()
 
-        # Mock des produits en rupture critique
-        ruptures_mock = [
-            Mock(produit_nom="Produit A", entite_nom="Magasin 1", quantite=0),
-            Mock(produit_nom="Produit B", entite_nom="Magasin 2", quantite=1)
-        ]
+        # Mock des produits en rupture critique avec des attributs appropriés
+        rupture_mock_1 = Mock()
+        rupture_mock_1.id_produit = 1
+        rupture_mock_1.id_entite = 1
+        rupture_mock_1.quantite = 0
+        rupture_mock_1.produit = Mock()
+        rupture_mock_1.produit.nom = "Produit A"
+        rupture_mock_1.entite = Mock()
+        rupture_mock_1.entite.nom = "Magasin 1"
+        
+        rupture_mock_2 = Mock()
+        rupture_mock_2.id_produit = 2
+        rupture_mock_2.id_entite = 2
+        rupture_mock_2.quantite = 1
+        rupture_mock_2.produit = Mock()
+        rupture_mock_2.produit.nom = "Produit B"
+        rupture_mock_2.entite = Mock()
+        rupture_mock_2.entite.nom = "Magasin 2"
+        
+        ruptures_mock = [rupture_mock_1, rupture_mock_2]
         service.repo_stock.obtenir_ruptures_critiques.return_value = ruptures_mock
 
         alertes = service.detecter_alertes_critiques()

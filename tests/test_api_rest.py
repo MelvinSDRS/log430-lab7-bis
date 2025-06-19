@@ -131,7 +131,7 @@ class TestAPIRest:
             assert 'prix' in data
         elif response.status_code == 404:
             data = json.loads(response.data)
-            assert data['status'] == 404
+            assert 'message' in data
 
     def test_create_product(self, client, auth_headers, sample_product_data):
         """Test de création d'un produit"""
@@ -334,7 +334,8 @@ class TestAPIRest:
         assert response.status_code == 404
         
         data = json.loads(response.data)
-        assert data['status'] == 404
+        assert 'message' in data
+        assert "99999" in data['message']
 
     # Tests CORS
     def test_cors_headers(self, client, auth_headers):
