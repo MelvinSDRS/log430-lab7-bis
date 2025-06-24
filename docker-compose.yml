@@ -329,6 +329,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
       - PYTHONPATH=/app
+      - API_TOKEN=pos-api-token-2025
     networks:
       - pos-network
     user: "root"
