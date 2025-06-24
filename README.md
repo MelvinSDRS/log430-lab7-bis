@@ -1,4 +1,4 @@
-# LOG430 - Lab 3 - Système POS Multi-Magasins
+# LOG430 - Lab 4 - Système POS Multi-Magasins
 
 ## Description
 
@@ -51,6 +51,27 @@ Cette séparation garantit des performances optimales et une maintenance facilit
 - **Authentification token** : Sécurité pour applications externes
 - **Standards RESTful** : HATEOAS, pagination, codes HTTP appropriés
 
+## Optimisations de performance
+
+Le système intègre des optimisations avancées pour haute performance et résilience :
+
+### Cache Redis distribué
+- **Gain** : -51% de latence sur endpoints complexes (1972ms → 965ms)
+- **Hit rate** : 99.25% sous charge élevée
+- **Endpoints cachés** : `/stores/performances`, `/reports/dashboard`, `/products`, `/stocks`
+- **TTL adaptatif** : 3-15 min selon la criticité des données
+
+### Load Balancer NGINX
+- **Stratégie** : Round Robin (optimale sous toutes charges)
+- **Scaling** : 2-4 instances API selon la charge
+- **Seuil critique** : Efficace uniquement au-delà de 80 utilisateurs simultanés
+- **Résilience** : Tolérance aux pannes avec redirection automatique
+
+### Architecture Adaptative
+- **< 50 VUs** : Instance unique + Cache Redis (simplicité optimale)
+- **> 80 VUs** : Load Balancer + Cache distribué (performance maximale)
+- **Monitoring** : Prometheus + Grafana pour observabilité complète
+
 ## Démarrage Rapide
 
 ### Prérequis
@@ -63,8 +84,14 @@ Cette séparation garantit des performances optimales et une maintenance facilit
 # Démarrer l'architecture complète (serveur + interface web + API REST + données multi-magasins)
 docker compose up -d
 
-# Accéder à l'interface web de supervision
-http://localhost:5000
+# Démarrer avec optimisations de performance (Load Balancer + Cache Redis + Monitoring)
+docker compose --profile performance up -d
+
+# Accéder aux interfaces
+http://localhost:5000                 # Interface web de supervision
+http://localhost:8000/api/docs        # API REST (documentation Swagger)
+http://localhost:8080                 # Load Balancer NGINX (si profil performance)
+http://localhost:3000                 # Grafana (monitoring - si profil performance)
 
 # Accéder à l'API REST et sa documentation
 http://localhost:8000/api/docs        # Documentation Swagger interactive
@@ -160,10 +187,13 @@ docker compose ps
 
 - **Python 3.11** : Langage de programmation
 - **PostgreSQL** : Base de données serveur
+- **Redis 7** : Cache distribué
+- **NGINX** : Load balancer
 - **SQLAlchemy** : ORM pour l'abstraction de la persistance
 - **Rich** : Interface console améliorée
 - **Flask** : Framework web pour l'interface de supervision
 - **Flask-RESTX** : Extension Flask pour API REST avec documentation Swagger
+- **Prometheus + Grafana** : Monitoring et observabilité
 - **Docker** : Conteneurisation et déploiement
 
 ## Structure du Projet
