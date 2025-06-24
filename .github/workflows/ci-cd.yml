@@ -7,7 +7,7 @@ on:
     branches: [ main, master ]
 
 env:
-  IMAGE_NAME: pos-system
+  IMAGE_NAME: pos-system-lab4
 
 jobs:
   # Job 1: Tests et qualité du code

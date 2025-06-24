@@ -253,6 +253,8 @@ tmp/
 # Application-specific
 data/
 logs/
+load_tests/baselines/
+load_test_results/
 
 # Project-specific database file
 pos_system.db

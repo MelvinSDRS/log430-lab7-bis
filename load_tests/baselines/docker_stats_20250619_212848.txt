@@ -1,0 +1,14 @@
+CONTAINER ID   NAME             CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+fa472664caa3   pos-grafana      0.73%     197.5MiB / 3.538GiB   5.45%     18.9MB / 68.9kB   135MB / 66.8MB    18
+906ecbfca65d   pos-magasin-4    0.00%     42.3MiB / 3.538GiB    1.17%     9.35kB / 8.61kB   406kB / 0B        1
+e3348c22421b   pos-api-rest     2.00%     86.85MiB / 3.538GiB   2.40%     107MB / 56.5MB    2.13MB / 13.2MB   7
+c5e3895a4b00   pos-magasin-2    0.00%     42.25MiB / 3.538GiB   1.17%     9.28kB / 8.61kB   36.9kB / 0B       1
+2c6a7198d462   pos-magasin-1    0.00%     42.26MiB / 3.538GiB   1.17%     8.99kB / 8.61kB   4.1kB / 0B        1
+7eed1edd750c   pos-web-admin    1.40%     94.21MiB / 3.538GiB   2.60%     4.52kB / 126B     16.4MB / 0B       3
+b426a9effae7   pos-magasin-3    0.00%     42.28MiB / 3.538GiB   1.17%     8.97kB / 8.61kB   61.4kB / 0B       1
+66eb586f64b6   pos-magasin-5    0.00%     42.27MiB / 3.538GiB   1.17%     9.26kB / 8.61kB   688kB / 0B        1
+fe6805a7b3cf   pos-postgres     0.00%     50.07MiB / 3.538GiB   1.38%     46MB / 104MB      19.7MB / 11MB     16
+9eabde0d97bb   pos-prometheus   0.00%     44.13MiB / 3.538GiB   1.22%     581kB / 129kB     38.3MB / 786kB    8
+edb65e87265d   pos-client-2     0.00%     40.6MiB / 3.538GiB    1.12%     96.2kB / 37.2kB   3.67MB / 0B       1
+8ac4dd0e9de8   pos-client-3     0.00%     40.1MiB / 3.538GiB    1.11%     97.2kB / 37.2kB   856kB / 0B        1
+eeb1a3be8002   pos-client-1     0.00%     40.11MiB / 3.538GiB   1.11%     441kB / 385kB     1.32MB / 0B       1

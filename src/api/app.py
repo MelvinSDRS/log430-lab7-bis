@@ -17,6 +17,9 @@ from .endpoints.stores import ns_stores
 from .endpoints.reports import ns_reports
 from .endpoints.stocks import ns_stocks
 from .error_handlers import register_error_handlers
+from .metrics import init_prometheus_metrics
+from .structured_logging import setup_structured_logging
+from .cache import init_cache
 
 
 def create_api_app():
@@ -61,7 +64,10 @@ def create_api_app():
     api.add_namespace(ns_stocks)
     
     configure_api_logging(app)
+    setup_structured_logging(app)
     register_error_handlers(app)
+    init_prometheus_metrics(app)
+    init_cache(app)
     
     @app.route('/api/health')
     def health_check():
@@ -71,6 +77,36 @@ def create_api_app():
             'service': 'POS Multi-Magasins API',
             'version': '1.0'
         }, 200
+    
+    @app.route('/api/cache/stats')
+    def cache_stats():
+        """Endpoint pour les statistiques du cache Redis"""
+        from .cache import get_cache_stats
+        return get_cache_stats(), 200
+    
+    @app.route('/api/cache/health')
+    def cache_health():
+        """Endpoint pour vérifier la santé du cache Redis"""
+        from .cache import check_cache_health, redis_client
+        try:
+            if redis_client:
+                redis_client.ping()
+                check_cache_health()
+                return {'status': 'healthy', 'cache': 'connected'}, 200
+            else:
+                return {'status': 'unhealthy', 'cache': 'disconnected'}, 503
+        except Exception as e:
+            return {'status': 'unhealthy', 'error': str(e)}, 503
+    
+    @app.route('/api/cache/warm')
+    def warm_cache_endpoint():
+        """Endpoint pour déclencher le cache warming"""
+        from .cache import warm_cache
+        try:
+            warm_cache()
+            return {'status': 'success', 'message': 'Cache warming initiated'}, 200
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}, 500
     
     return app
 

@@ -155,18 +155,63 @@ services:
       - pos-network
     restart: "no"
 
-  # API REST Service
-  api-rest:
-    build: .
-    container_name: pos-api-rest
-    command: python main.py
+  # Load Balancer (NGINX)
+  load-balancer:
+    image: nginx:alpine
+    container_name: pos-load-balancer
     ports:
-      - "8000:8000"
+      - "8080:80"
+    volumes:
+      - ./load_balancer/nginx-active.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-rest-1
+      - api-rest-2
+    profiles:
+      - load-balancer
+    networks:
+      - pos-network
+
+  # Cache distribué Redis
+  redis-cache:
+    image: redis:7-alpine
+    container_name: pos-redis-cache
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis-secret-lab4-2025}
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/etc/redis/redis.conf:ro
+    command: |
+      redis-server /etc/redis/redis.conf
+      --requirepass ${REDIS_PASSWORD:-redis-secret-lab4-2025}
+      --appendonly yes 
+      --maxmemory 512mb 
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 300
+      --timeout 0
+      --save 900 1 
+      --save 300 10
+      --loglevel notice
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis-secret-lab4-2025}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - pos-network
+
+  # API REST Instance 1
+  api-rest-1:
+    build: .
+    container_name: pos-api-rest-1
+    command: python main.py
+    expose:
+      - "8000"
     environment:
       - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
       - APP_MODE=api
       - FLASK_DEBUG=1
       - CORS_ORIGINS=http://localhost:3000,http://localhost:5000
+      - INSTANCE_ID=1
     volumes:
       - .:/app
     depends_on:
@@ -180,6 +225,95 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    profiles:
+      - load-balancer
+
+  # API REST Instance 2
+  api-rest-2:
+    build: .
+    container_name: pos-api-rest-2
+    command: python main.py
+    expose:
+      - "8000"
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
+      - APP_MODE=api
+      - FLASK_DEBUG=1
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5000
+      - INSTANCE_ID=2
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pos-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - load-balancer
+
+  # API REST Instance 3
+  api-rest-3:
+    build: .
+    container_name: pos-api-rest-3
+    command: python main.py
+    expose:
+      - "8000"
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
+      - APP_MODE=api
+      - FLASK_DEBUG=1
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5000
+      - INSTANCE_ID=3
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pos-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - load-balancer
+
+  # API REST Instance 4
+  api-rest-4:
+    build: .
+    container_name: pos-api-rest-4
+    command: python main.py
+    expose:
+      - "8000"
+    environment:
+      - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
+      - APP_MODE=api
+      - FLASK_DEBUG=1
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5000
+      - INSTANCE_ID=4
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pos-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - load-balancer
 
   # Test service
   pos-test:
@@ -198,11 +332,44 @@ services:
     user: "root"
     profiles:
       - test
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pos-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
     networks:
       - pos-network
+    restart: unless-stopped
+  
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pos-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - pos-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  prometheus_data:
+  grafana_data:
+  redis_data:
 
 networks:
   pos-network:

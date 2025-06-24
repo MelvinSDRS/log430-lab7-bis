@@ -11,6 +11,7 @@ from ...persistence.repositories import RepositoryStockEntite, RepositoryEntite
 from ..auth import auth_token
 from ..models import stock_entite_model, entite_model, error_model
 from flask_restx import fields
+from ..cache import cache_endpoint, get_cache_timeout, invalidate_cache_pattern
 import logging
 
 logger = logging.getLogger(__name__)
@@ -347,6 +348,7 @@ class StockRupturesResource(Resource):
     @ns_stocks.param('page', 'Numéro de page (défaut: 1)', type=int)
     @ns_stocks.param('per_page', 'Éléments par page (défaut: 20, max: 100)', type=int)
     @ns_stocks.param('entite_id', 'Filtrer par ID d\'entité', type=int)
+    @cache_endpoint(timeout=get_cache_timeout('stock_ruptures'), key_prefix='stocks_')
     @auth_token
     def get(self):
         """

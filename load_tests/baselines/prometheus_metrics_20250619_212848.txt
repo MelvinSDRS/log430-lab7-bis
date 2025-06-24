@@ -1,0 +1,64 @@
+# HELP python_gc_objects_collected_total Objects collected during gc
+# TYPE python_gc_objects_collected_total counter
+python_gc_objects_collected_total{generation="0"} 71388.0
+python_gc_objects_collected_total{generation="1"} 22850.0
+python_gc_objects_collected_total{generation="2"} 13838.0
+# HELP python_gc_objects_uncollectable_total Uncollectable objects found during GC
+# TYPE python_gc_objects_uncollectable_total counter
+python_gc_objects_uncollectable_total{generation="0"} 0.0
+python_gc_objects_uncollectable_total{generation="1"} 0.0
+python_gc_objects_uncollectable_total{generation="2"} 0.0
+# HELP python_gc_collections_total Number of times this generation was collected
+# TYPE python_gc_collections_total counter
+python_gc_collections_total{generation="0"} 14630.0
+python_gc_collections_total{generation="1"} 1329.0
+python_gc_collections_total{generation="2"} 116.0
+# HELP python_info Python platform information
+# TYPE python_info gauge
+python_info{implementation="CPython",major="3",minor="11",patchlevel="13",version="3.11.13"} 1.0
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 1.172881408e+09
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 1.03849984e+08
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.75036776146e+09
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 177.37
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 13.0
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1.048576e+06
+# HELP api_request_duration_seconds Temps de réponse des requêtes API
+# TYPE api_request_duration_seconds histogram
+# HELP api_requests_total Nombre total de requêtes
+# TYPE api_requests_total counter
+# HELP api_errors_total Nombre total d'erreurs
+# TYPE api_errors_total counter
+# HELP api_active_connections Nombre de connexions actives
+# TYPE api_active_connections gauge
+api_active_connections 1.0
+# HELP api_database_connections Connexions base de données
+# TYPE api_database_connections gauge
+# HELP system_cpu_usage_percent Utilisation CPU
+# TYPE system_cpu_usage_percent gauge
+system_cpu_usage_percent 0.0
+# HELP system_memory_usage_percent Utilisation mémoire
+# TYPE system_memory_usage_percent gauge
+system_memory_usage_percent 0.0
+# HELP business_operations_total Opérations métier
+# TYPE business_operations_total counter
+# HELP flask_exporter_info Information about the Prometheus Flask exporter
+# TYPE flask_exporter_info gauge
+flask_exporter_info{version="0.23.0"} 1.0
+# HELP flask_http_request_duration_seconds Flask HTTP request duration in seconds
+# TYPE flask_http_request_duration_seconds histogram
+# HELP flask_http_request_total Total number of HTTP requests
+# TYPE flask_http_request_total counter
+# HELP flask_http_request_exceptions_total Total number of HTTP requests which resulted in an exception
+# TYPE flask_http_request_exceptions_total counter

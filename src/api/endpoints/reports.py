@@ -12,6 +12,7 @@ from ...persistence.repositories import RepositoryRapport
 from ..auth import auth_token
 from ..models import rapport_model, rapport_request_model, indicateur_performance_model, error_model
 from flask_restx import fields
+from ..cache import cache_endpoint, get_cache_timeout
 import logging
 import json
 
@@ -259,6 +260,7 @@ class DashboardResource(Resource):
     @ns_reports.doc('get_dashboard', security='apikey')
     @ns_reports.response(200, 'Succès')
     @ns_reports.response(401, 'Non autorisé', error_response)
+    @cache_endpoint(timeout=get_cache_timeout('dashboard'), key_prefix='reports_')
     @auth_token
     def get(self):
         """

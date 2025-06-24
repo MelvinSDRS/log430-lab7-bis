@@ -11,6 +11,7 @@ from ...persistence.repositories import RepositoryEntite
 from ..auth import auth_token
 from ..models import entite_model, indicateur_performance_model, error_model
 from flask_restx import fields
+from ..cache import cache_endpoint, get_cache_timeout, invalidate_cache_pattern
 import logging
 
 logger = logging.getLogger(__name__)
@@ -165,6 +166,7 @@ class StorePerformancesResource(Resource):
     @ns_stores.doc('get_store_performances', security='apikey')
     @ns_stores.response(200, 'Succès')
     @ns_stores.response(401, 'Non autorisé', error_response)
+    @cache_endpoint(timeout=get_cache_timeout('stores_performances'), key_prefix='stores_')
     @auth_token
     def get(self):
         """

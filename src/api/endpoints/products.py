@@ -10,6 +10,7 @@ from ..auth import auth_token
 from ..models import product_model, product_create_model, product_update_model, error_model
 from ..bounded_contexts.product_catalog.application.product_application_service import ProductApplicationService
 from ..bounded_contexts.product_catalog.infrastructure.product_repository_adapter import ProductRepositoryAdapter
+from ..cache import cache_endpoint, get_cache_timeout, invalidate_cache_pattern
 import logging
 from werkzeug.exceptions import NotFound
 
@@ -42,6 +43,7 @@ class ProductListResource(Resource):
     @ns_products.param('search', 'Recherche par nom de produit', type=str)
     @ns_products.param('category', 'Filtrer par identifiant de catégorie', type=int)
     @ns_products.param('sort', 'Tri: nom,asc|nom,desc|prix,asc|prix,desc (défaut: nom,asc)', type=str)
+    @cache_endpoint(timeout=get_cache_timeout('products_list'), key_prefix='products_')
     @auth_token
     def get(self):
         """
@@ -147,6 +149,9 @@ class ProductListResource(Resource):
             }
             
             response = product_service.create_product(product_data)
+            
+            invalidate_cache_pattern('products')
+            invalidate_cache_pattern('dashboard')
             
             logger.info(f"Produit créé - ID: {response['id']}, Nom: {response['nom']}")
             return response, 201
