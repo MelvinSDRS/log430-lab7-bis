@@ -329,6 +329,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://pos_user:pos_password@postgres:5432/pos_multimagasins
       - PYTHONPATH=/app
+    networks:
+      - pos-network
     user: "root"
     profiles:
       - test
