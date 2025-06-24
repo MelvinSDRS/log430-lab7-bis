@@ -1,6 +1,6 @@
 import os
 import time
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import OperationalError
 from .models import Base
@@ -20,7 +20,7 @@ def wait_for_db(max_retries=30, delay=1):
         try:
             # Essayer de se connecter à la base de données
             with engine.connect() as conn:
-                conn.execute("SELECT 1")
+                conn.execute(text("SELECT 1"))
             print("Base de données disponible!")
             return True
         except OperationalError as e:
