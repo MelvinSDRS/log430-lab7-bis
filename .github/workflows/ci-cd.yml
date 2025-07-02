@@ -88,7 +88,28 @@ jobs:
       - name: Test microservices architecture
         run: |
           echo "Testing complete microservices architecture..."
+          
+          # Copier les configurations nécessaires
+          echo "Copying monitoring configuration..."
+          cp -r monitoring/ microservices/
+          
           cd microservices/
+          
+          # Vérifier que les fichiers sont bien présents
+          if [ -f "monitoring/prometheus/prometheus.yml" ]; then
+            echo "✅ Prometheus configuration found"
+          else
+            echo "❌ Prometheus configuration missing"
+            ls -la monitoring/ || echo "monitoring directory not found"
+            exit 1
+          fi
+          
+          if [ -d "monitoring/grafana/provisioning" ]; then
+            echo "✅ Grafana provisioning configuration found"
+          else
+            echo "❌ Grafana provisioning configuration missing"
+            exit 1
+          fi
           
           # Démarrer l'architecture complète
           docker compose up -d
