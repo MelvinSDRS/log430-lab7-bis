@@ -1,50 +1,161 @@
 @startuml
-participant "Employé Magasin" as EM
-participant "Console POS" as UI
-participant "ServiceVente" as SV
-participant "ServiceInventaire" as SI
-participant "RepositoryVente" as RV
-participant "RepositoryProduit" as RP
-participant "Base de Données" as BD
+title E-commerce Checkout Process - Microservices Architecture
 
-EM -> UI: Sélectionner produits et quantités
-UI -> SV: creer_vente(panier, id_caisse, id_caissier, id_entite)
-activate SV
+actor "Client E-commerce" as CLIENT
+participant "Kong Gateway" as KONG
+participant "Customer Service" as CUSTOMER_SVC
+participant "Product Service" as PRODUCT_SVC
+participant "Cart Service" as CART_SVC
+participant "Inventory Service" as INVENTORY_SVC
+participant "Order Service" as ORDER_SVC
+database "Redis Cache" as REDIS
+database "Customer DB" as CUSTOMER_DB
+database "Product DB" as PRODUCT_DB
+database "Inventory DB" as INVENTORY_DB
+database "Order DB" as ORDER_DB
 
-SV -> SI: verifier_disponibilite(panier, id_entite)
-activate SI
-SI -> RP: consulter_stocks(produits, id_entite)
-RP -> BD: SELECT stocks par entité
-BD --> RP: stocks disponibles
-RP --> SI: disponibilités
-SI --> SV: validation stocks
-deactivate SI
+' 1. Customer Authentication
+CLIENT -> KONG : POST /api/v1/customers/auth
+activate KONG
+KONG -> CUSTOMER_SVC : authenticate(email, password)
+activate CUSTOMER_SVC
+CUSTOMER_SVC -> CUSTOMER_DB : verify credentials
+CUSTOMER_DB --> CUSTOMER_SVC : customer data
+CUSTOMER_SVC --> KONG : JWT token + customer_id
+deactivate CUSTOMER_SVC
+KONG --> CLIENT : 200 OK + JWT token
+deactivate KONG
 
-SV -> SI: reserver_stock(panier, id_entite)
-activate SI
-SI -> RP: mettre_a_jour_stocks(produits, quantites, id_entite)
-RP -> BD: UPDATE stocks
-BD --> RP: confirmation
-RP --> SI: stocks réservés
-SI --> SV: réservation confirmée
-deactivate SI
+' 2. Browse Products
+CLIENT -> KONG : GET /api/v1/products?category=electronics
+activate KONG
+KONG -> PRODUCT_SVC : get_products_by_category(electronics)
+activate PRODUCT_SVC
+PRODUCT_SVC -> PRODUCT_DB : SELECT products WHERE category...
+PRODUCT_DB --> PRODUCT_SVC : product list
+PRODUCT_SVC --> KONG : products with details
+deactivate PRODUCT_SVC
+KONG --> CLIENT : 200 OK + product catalog
+deactivate KONG
 
-SV -> RV: sauvegarder(vente)
-activate RV
-RV -> BD: INSERT vente avec id_entite
-RV -> BD: INSERT lignes_vente
-BD --> RV: vente sauvegardée
-RV --> SV: vente créée
-deactivate RV
+' 3. Add to Cart (Load Balanced)
+CLIENT -> KONG : POST /api/v1/cart/items
+activate KONG
+KONG -> CART_SVC : add_to_cart(session_id, product_id, quantity)
+note right : Load balanced to Cart Service instance
+activate CART_SVC
+CART_SVC -> REDIS : SADD cart:session_id product_data
+REDIS --> CART_SVC : OK
+CART_SVC -> PRODUCT_SVC : get_product(product_id)
+activate PRODUCT_SVC
+PRODUCT_SVC -> PRODUCT_DB : SELECT product WHERE id...
+PRODUCT_DB --> PRODUCT_SVC : product details
+PRODUCT_SVC --> CART_SVC : product info + price
+deactivate PRODUCT_SVC
+CART_SVC -> REDIS : UPDATE cart with product details
+REDIS --> CART_SVC : cart updated
+CART_SVC --> KONG : cart with items + totals
+deactivate CART_SVC
+KONG --> CLIENT : 200 OK + updated cart
+deactivate KONG
 
-SV --> UI: id_vente
-deactivate SV
-UI --> EM: Vente confirmée
+' 4. Calculate Taxes
+CLIENT -> KONG : POST /api/v1/cart/taxes
+activate KONG
+KONG -> CART_SVC : calculate_taxes(session_id)
+activate CART_SVC
+CART_SVC -> REDIS : HGETALL cart:session_id
+REDIS --> CART_SVC : cart items
+CART_SVC -> CART_SVC : calculate GST (5%) + QST (9.975%)
+CART_SVC --> KONG : tax breakdown + total
+deactivate CART_SVC
+KONG --> CLIENT : 200 OK + tax calculation
+deactivate KONG
 
-note right of SV
-  Nouveauté Lab 2:
-  Gestion par entité (magasin)
-  Stocks séparés par magasin
+' 5. Checkout Process
+CLIENT -> KONG : POST /api/v1/checkout
+activate KONG
+KONG -> ORDER_SVC : process_checkout(customer_id, session_id, payment_info)
+activate ORDER_SVC
+
+' 5a. Validate Cart
+ORDER_SVC -> CART_SVC : get_cart(session_id)
+activate CART_SVC
+CART_SVC -> REDIS : HGETALL cart:session_id
+REDIS --> CART_SVC : cart data
+CART_SVC --> ORDER_SVC : cart items + totals
+deactivate CART_SVC
+
+' 5b. Reserve Stock
+loop for each cart item
+    ORDER_SVC -> INVENTORY_SVC : reserve_stock(product_id, quantity, "ecommerce")
+    activate INVENTORY_SVC
+    INVENTORY_SVC -> INVENTORY_DB : UPDATE stock SET reserved = reserved + quantity
+    INVENTORY_DB --> INVENTORY_SVC : stock reserved
+    INVENTORY_SVC --> ORDER_SVC : reservation confirmed
+    deactivate INVENTORY_SVC
+end
+
+' 5c. Validate Customer
+ORDER_SVC -> CUSTOMER_SVC : get_customer(customer_id)
+activate CUSTOMER_SVC
+CUSTOMER_SVC -> CUSTOMER_DB : SELECT customer WHERE id...
+CUSTOMER_DB --> CUSTOMER_SVC : customer data + addresses
+CUSTOMER_SVC --> ORDER_SVC : customer info + shipping address
+deactivate CUSTOMER_SVC
+
+' 5d. Create Order
+ORDER_SVC -> ORDER_DB : INSERT order (customer_id, items, totals, status=PENDING)
+ORDER_DB --> ORDER_SVC : order_id generated
+ORDER_SVC -> ORDER_DB : INSERT order_items for each cart item
+ORDER_DB --> ORDER_SVC : order items created
+
+' 5e. Process Payment (Simulated)
+ORDER_SVC -> ORDER_SVC : process_payment(payment_info, total_amount)
+note right : Payment gateway integration
+ORDER_SVC -> ORDER_DB : UPDATE order SET status = CONFIRMED, payment_id = ...
+ORDER_DB --> ORDER_SVC : order updated
+
+' 5f. Clear Cart
+ORDER_SVC -> CART_SVC : clear_cart(session_id)
+activate CART_SVC
+CART_SVC -> REDIS : DEL cart:session_id
+REDIS --> CART_SVC : cart cleared
+CART_SVC --> ORDER_SVC : cart cleared
+deactivate CART_SVC
+
+ORDER_SVC --> KONG : order created + order_number
+deactivate ORDER_SVC
+KONG --> CLIENT : 201 Created + order details
+deactivate KONG
+
+' 6. Order Confirmation
+CLIENT -> KONG : GET /api/v1/orders/{order_id}
+activate KONG
+KONG -> ORDER_SVC : get_order(order_id)
+activate ORDER_SVC
+ORDER_SVC -> ORDER_DB : SELECT order WHERE id...
+ORDER_DB --> ORDER_SVC : order details + items
+ORDER_SVC --> KONG : complete order information
+deactivate ORDER_SVC
+KONG --> CLIENT : 200 OK + order confirmation
+deactivate KONG
+
+note over CLIENT, ORDER_DB
+  Microservices E-commerce Flow:
+  1. Customer authentication via Customer Service
+  2. Product browsing via Product Service
+  3. Cart management via load-balanced Cart Service (Redis)
+  4. Stock reservation via Inventory Service
+  5. Order creation via Order Service
+  6. All requests routed through Kong Gateway
+  
+  Key Features:
+  - Load balancing for Cart Service (3 instances)
+  - Database per Service pattern (5 PostgreSQL + Redis)
+  - JWT authentication and API key validation
+  - Transactional consistency across services
+  - Real-time stock validation and reservation
 end note
 
 @enduml

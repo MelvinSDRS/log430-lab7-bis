@@ -1,0 +1,54 @@
+{
+  "test_name": "Lab 5 Fair Comparison - 100 VUs (High Load) - SAME COMPLEXITY",
+  "test_conditions": {
+    "virtual_users": 100,
+    "duration": "10 minutes total (7m at peak)",
+    "architecture": "Microservices with Kong Gateway",
+    "complexity_simulation": "Multiple intensive requests per cycle to match Lab 4 high load",
+    "total_requests_per_cycle": "22+ requests at peak (matching Lab 4 saturation pattern)",
+    "comparison_basis": "Lab 4 high load conditions EXACTLY reproduced",
+    "test_pattern": "Intensive load matching Lab 4 100 VUs saturation point"
+  },
+  "metrics": {
+    "total_requests": 682170,
+    "request_rate": 1136.8133893358406,
+    "avg_latency": 28.35630848930965,
+    "p95_latency": 96.42920974999993,
+    "p90_latency": 72.8213962,
+    "median_latency": 14.943746,
+    "error_rate": 0.9991409765894131,
+    "success_rate": 0.666953007803529,
+    "kong_gateway_p95": 425.75,
+    "kong_gateway_avg": 141.03242320819112,
+    "total_iterations": 29307
+  },
+  "lab4_comparison_baseline": {
+    "lab4_baseline_100vu": "FAILED - System saturation",
+    "lab4_load_balancer_100vu": "66.7% error rate - Service degraded",
+    "lab4_cache_100vu": "0% error rate - 6,796 iterations in 7m",
+    "lab4_cache_hit_rate": "99.25%",
+    "expectations": {
+      "error_rate": "<10% (vs Lab 4: 66.7% without cache)",
+      "stability": "Should remain stable at 100 VUs",
+      "throughput": "Should exceed Lab 4 cache performance (6,796 iterations/7m)",
+      "iterations_target": ">6,796 iterations in 7 minutes to beat Lab 4 cache"
+    }
+  },
+  "complexity_matching": {
+    "lab4_stores_performances_100vu": "30+ SQL queries causing saturation",
+    "lab5_simulation": "22+ microservice requests simulating same load",
+    "saturation_point": "Lab 4 saturated at 100 VUs, Lab 5 should handle better",
+    "architectural_advantage": "Database per service vs single PostgreSQL"
+  },
+  "architecture_comparison": {
+    "lab4_architecture": "Monolith + NGINX Load Balancer + Redis Cache",
+    "lab5_architecture": "Microservices + Kong Gateway + Database per Service",
+    "expected_advantages": [
+      "Better isolation between services",
+      "No single point of failure at database level",
+      "Kong intelligent load balancing",
+      "Service-specific optimizations",
+      "Horizontal scalability per service"
+    ]
+  }
+}

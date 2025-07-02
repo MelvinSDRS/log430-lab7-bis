@@ -1,0 +1,37 @@
+{
+  "test_name": "Lab 5 Fair Comparison - 15 VUs (Low Load) - SAME COMPLEXITY",
+  "test_conditions": {
+    "virtual_users": 15,
+    "duration": "6 minutes",
+    "architecture": "Microservices with Kong Gateway",
+    "complexity_simulation": "Multiple requests per cycle to match Lab 4 SQL complexity",
+    "total_requests_per_cycle": "13+ requests (matching Lab 4 /stores/performances pattern)",
+    "comparison_basis": "Lab 4 conditions EXACTLY reproduced"
+  },
+  "metrics": {
+    "total_requests": 33048,
+    "request_rate": 91.31178708205101,
+    "avg_latency": 2.6408596807673694,
+    "p95_latency": 7.839137199999998,
+    "p90_latency": 4.466705799999999,
+    "median_latency": 1.6975354999999999,
+    "error_rate": 0.9576373759380296,
+    "success_rate": 0.6807875413539901,
+    "kong_gateway_p95": 27,
+    "kong_gateway_avg": 11.976428571428572
+  },
+  "lab4_comparison_baseline": {
+    "lab4_baseline_latency": "1972ms",
+    "lab4_load_balancer_latency": "2706ms",
+    "lab4_cache_latency": "965ms",
+    "lab4_baseline_throughput": "1.84 req/s",
+    "lab4_cache_throughput": "2.43 req/s",
+    "expected_lab5_advantage": "Microservices should outperform monolith + cache"
+  },
+  "complexity_matching": {
+    "lab4_stores_performances": "30+ SQL queries per request",
+    "lab5_simulation": "13+ microservice requests per cycle",
+    "pattern_equivalence": "Same CPU/network load patterns",
+    "business_logic_similarity": "Product catalog + customer data aggregation"
+  }
+}

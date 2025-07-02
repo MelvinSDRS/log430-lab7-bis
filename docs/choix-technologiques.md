@@ -1,213 +1,295 @@
-# Choix Technologiques
+# Choix Technologiques - Architecture Microservices
 
-## Évolution Lab 1 → Lab 2 → Lab 3
+## Évolution architecturale (Lab 1 → Lab 5)
 
-### Maintenu du Lab 1
-- **Python 3.11+** : Langage principal
-- **PostgreSQL + SQLAlchemy** : Base de données et ORM
-- **Docker + Docker Compose** : Conteneurisation
-- **Pytest** : Framework de tests
+### Lab 1-3 : Architecture monolithique
+- **Python + Flask** : Application monolithique
+- **PostgreSQL unique** : Base de données centralisée
+- **Interface web MVC** : Supervision simple
+- **API REST Flask-RESTX** : Extension Lab 3
 
-### Ajouté pour Lab 2
-- **Flask** : Framework web pour interface MVC
-- **Jinja2** : Moteur de templates (inclus avec Flask)
-- **CSS natif** : Interface simplifiée sans framework externe
+### Lab 5 : Architecture microservices distribuée
+- **7 microservices indépendants** : Product, Customer, Cart, Order, Inventory, Sales, Reporting
+- **Kong API Gateway** : Point d'entrée unique avec load balancing
+- **Database per Service** : 7 PostgreSQL + 1 Redis isolés
+- **Docker orchestration** : Déploiement containerisé avancé
+- **Observabilité stack** : Prometheus + Grafana
 
-### Ajouté pour Lab 3
-- **Flask-RESTX** : Extension Flask pour API REST
-- **Flask-CORS** : Support Cross-Origin Resource Sharing
-- **OpenAPI/Swagger** : Documentation API automatique
+## API Gateway
 
-## Langage de programmation
+**Choix : Kong Gateway** (nouveau Lab 5)
 
-**Choix: Python 3.11+** (maintenu)
+Justification :
+- **Point d'entrée unique** : Centralisation de toutes les API calls
+- **Load balancing avancé** : Support multiple instances avec failover automatique
+- **Authentication robuste** : API Key + JWT pour différents types clients
+- **Rate limiting** : Protection DDoS et fair usage (100/min, 1000/hour)
+- **Health monitoring** : Circuit breaker et detection pannes automatique
+- **Plugin ecosystem** : CORS, logging, metrics, transformations
+- **Performance** : Nginx-based, optimisé pour haute charge
+- **Standards** : OpenAPI/Swagger documentation intégrée
 
-Justification:
-- Continuité avec le système existant
-- Simplicité et lisibilité pour faciliter la maintenance
-- Écosystème riche de bibliothèques pour accélérer le développement
-- Portabilité multi-plateforme
-- Intégration facile avec différents systèmes de bases de données
-- Support excellent pour les frameworks web (Flask)
+### Configuration Kong Lab 5
+- **Port d'écoute** : 8080 (point d'entrée unique)
+- **Upstreams** : Load balancing Cart Service (3 instances)
+- **Algorithme** : least-connections pour distribution optimale
+- **Health checks** : GET /health toutes les 15 secondes
+- **Failover** : Exclusion automatique instances unhealthy
+- **CORS** : Configuration pour applications web (localhost:3000, 3001, 5000)
 
-## Base de données
+## Microservices
 
-**Choix: PostgreSQL + SQLAlchemy (ORM)** (maintenu et étendu)
+**Choix : Flask per service** (évolution Lab 5)
 
-Justification:
-- Continuité avec l'architecture existante
-- PostgreSQL: Base de données serveur robuste pour architecture 3-tier
-- SQLAlchemy: Abstraction de la couche de persistance via un ORM
-- Support des connexions multiples simultanées (multi-magasins)
-- Garanties ACID pour les transactions distribuées
-- Scalabilité pour évolutions futures (plus de magasins)
+Justification :
+- **Simplicité** : Framework léger et adapté microservices
+- **Autonomie** : Chaque service peut évoluer indépendamment
+- **Performance** : Overhead minimal per service
+- **Écosystème** : Compatible avec stack existante Python
+- **Developer experience** : Courbe d'apprentissage réduite
+- **Testing** : Isolation complète pour tests unitaires
 
-### Optimisations de performance
-- **Index composites optimisés** : 4 index essentiels pour les requêtes critiques
-- **Index sur colonnes critiques** : Ventes par entité/date, stocks par entité/produit, recherche produits, statut demandes
-- **Requêtes optimisées** : Rapports consolidés et tableaux de bord
+### Stack par microservice
+- **Python 3.11+** : Langage principal maintenu
+- **Flask** : Framework web léger
+- **SQLAlchemy** : ORM pour services avec PostgreSQL
+- **Redis client** : Pour Cart Service (cache distribué)
+- **Requests** : Communication HTTP inter-services
+- **Health checks** : Endpoint `/health` standardisé
 
-## Framework Web
+## Persistance microservices
 
-**Choix: Flask + Flask-RESTX**
+**Choix : Database per Service pattern**
 
-Justification:
-- **Simplicité** : Framework léger et facile à apprendre
-- **Flexibilité** : Permet une architecture MVC personnalisée
-- **Intégration** : Compatible avec SQLAlchemy existant
-- **Réutilisation** : Utilisation directe des services métier du Lab 1
-- **Évolutivité** : Peut évoluer vers des besoins plus complexes
-- **Écosystème Python** : Cohérent avec le stack technique existant
+Justification :
+- **Isolation des données** : Aucun accès direct cross-database
+- **Autonomie des équipes** : Schema evolution indépendante
+- **Scalabilité** : Optimisation per service
+- **Fault tolerance** : Panne d'un service n'affecte pas les autres
+- **Technology diversity** : Choix optimal per bounded context
 
-### Extensions Flask utilisées
-- **Flask-SQLAlchemy** : Intégration avec l'ORM existant
-- **Jinja2** : Moteur de templates (inclus avec Flask)
-- **Flask-RESTX** : API REST avec documentation Swagger automatique
-- **Flask-CORS** : Support pour applications externes
+### Databases par service
+- **Product Service** : PostgreSQL (product_db) - CRUD performant
+- **Customer Service** : PostgreSQL (customer_db) - Relations complexes
+- **Inventory Service** : PostgreSQL (inventory_db) - Transactions ACID
+- **Sales Service** : PostgreSQL (sales_db) - Historique ventes
+- **Reporting Service** : PostgreSQL (reporting_db) - Analytics
+- **Order Service** : PostgreSQL (order_db) - Workflow commandes
+- **Cart Service** : Redis (cart_cache) - Session state haute performance
 
-## API REST
+**Ports dédiés per database :**
+- Product DB : 5433
+- Customer DB : 5434
+- Inventory DB : 5435
+- Sales DB : 5436
+- Reporting DB : 5437
+- Order DB : 5438
+- Cart Cache : 6380
 
-**Choix: Flask-RESTX avec architecture DDD**
+## Cache distribué
 
-Justification:
-- **Cohérence architecturale** : Extension naturelle de Flask existant
-- **Documentation automatique** : Génération Swagger/OpenAPI intégrée
-- **Architecture métier structurée** : DDD pour organiser la logique métier de l'API
-- **Standards RESTful** : Support HATEOAS, pagination, codes HTTP
+**Choix : Redis pour Cart Service** (nouveau Lab 5)
 
-### Fonctionnalités implémentées
-- **4 cas d'usage principaux** : rapports consolidés, consultation stocks, performances magasins, gestion produits
-- **Authentification par token** : Sécurité simple et efficace
-- **Documentation interactive** : Interface Swagger à `/api/docs`
-- **Standards REST** : CRUD complet, pagination, filtrage
-- **Architecture DDD** : Value Objects, Aggregates et Domain Services pour Product Catalog
-- **Gestion d'erreurs** : Réponses structurées et codes HTTP appropriés
+Justification :
+- **Performance** : Accès sub-millisecond pour session state
+- **Shared state** : 3 instances Cart Service partagent même cache
+- **Expiration automatique** : TTL pour nettoyage sessions
+- **Data structures** : Hash maps optimales pour panier
+- **Persistence** : Append-only file pour recovery
+- **Memory management** : LRU eviction policy (512MB max)
 
-## Interface Utilisateur
+### Configuration Redis avancée
+- **Password protection** : `cart-cache-secret-2025`
+- **Persistence** : AOF + RDB snapshots
+- **Memory policy** : allkeys-lru pour éviction automatique
+- **TCP keepalive** : 300s pour connexions persistantes
+- **Max memory** : 512MB avec politique LRU
 
-**Choix: Architecture hybride simplifiée** (évolution)
+## Load Balancing
 
-### Interface Console
-- **Rich** : Interface console avancée pour les caisses en magasin
-- Continuité pour les employés de magasin
+**Choix : Kong Upstream avec least-connections** (nouveau Lab 5)
 
-### Interface Web MVC
-- **Flask + Jinja2** : Templates HTML pour supervision
-- **CSS natif** : Styles personnalisés sans framework externe
-- **Interface épurée** : Focus sur la fonctionnalité plutôt que l'esthétique
+Justification :
+- **Distribution optimale** : Based on active connections count
+- **High availability** : 3 instances Cart Service actives
+- **Health monitoring** : Détection pannes automatique
+- **Session stickiness** : Via Redis shared state
+- **Zero downtime** : Failover transparent
+- **Auto scaling ready** : Ajout/suppression instances dynamique
 
-Justification de la simplification:
-- **Performance** : Chargement plus rapide sans dépendances externes
-- **Maintenabilité** : Code CSS maîtrisé et personnalisable
-- **Simplicité** : Interface fonctionnelle sans complexité inutile
-- **Autonomie** : Pas de dépendance à des CDN externes
+### Stratégie de load balancing
+- **Algorithm** : least-connections (optimal pour API REST)
+- **Health checks** : HTTP GET /health every 15s
+- **Failure detection** : 3 consecutive failures → unhealthy
+- **Recovery detection** : 2 consecutive success → healthy
+- **Weight distribution** : Equal weight (100) per instance
 
-## Tests
+## Observabilité et monitoring
 
-**Choix: Pytest + extensions**
+**Choix : Prometheus + Grafana stack** (nouveau Lab 5)
 
-Justification:
-- Continuité avec les tests existants
-- Framework de test simple et puissant
-- Support pour les tests unitaires, d'intégration et end-to-end
+Justification :
+- **Industry standard** : Solutions éprouvées microservices
+- **Multi-dimensional metrics** : Labels pour segmentation fine
+- **Time series DB** : Optimisé pour métriques temporelles
+- **Alerting** : AlertManager pour notifications proactives
+- **Visualization** : Dashboards Grafana interactifs
+- **Service discovery** : Auto-discovery services via Kong
 
-### Types de tests
-- **Tests unitaires** : Services métier et logique (étendus)
-- **Tests d'intégration** : Base de données et repositories
-- **Tests des nouveaux services** : Approvisionnement, rapports, tableau de bord
-- **Tests de performance** : Charge multi-magasins
+### Métriques collectées
+- **Kong Gateway** : Request rate, latency, error rate, upstream health
+- **Microservices** : Response time, throughput, error count, health status
+- **Business metrics** : Order conversion, cart abandonment, revenue
+- **Infrastructure** : CPU, memory, disk, network per service
 
-### Nouveaux tests ajoutés
-- **ServiceApprovisionnement** : Création et traitement des demandes
-- **ServiceRapport** : Génération de rapports consolidés
-- **ServiceTableauBord** : Calcul des indicateurs de performance
+### Dashboards Grafana
+- **Kong API Gateway Overview** : Traffic patterns, performance, errors
+- **Microservices Health** : Service status, response times, error rates
+- **Business KPIs** : Revenue trends, order metrics, customer activity
+- **Infrastructure Monitoring** : Resource utilization, capacity planning
 
-## Observabilité et Monitoring
+## Communication inter-services
 
-**Choix: Logging Python natif**
+**Choix : HTTP REST synchrone** (Lab 5)
 
-Justification:
-- **Simplicité** : Utilisation du module logging standard Python
-- **Flexibilité** : Configuration adaptable selon l'environnement
-- **Performance** : Logging asynchrone et rotation automatique
-- **Traçabilité** : Logs structurés pour débogage et audit
+Justification :
+- **Simplicité** : Standard web bien maîtrisé
+- **Debugging** : Facilité de troubleshooting
+- **Tooling** : Support outillage existant (Postman, curl, etc.)
+- **Standards** : RESTful APIs avec conventions claires
+- **Error handling** : HTTP status codes standardisés
+- **Documentation** : OpenAPI/Swagger automatique
 
-### Configuration du logging
-- **Logs applicatifs** : `logs/pos_multimagasins.log`
-- **Logs des services** : `logs/services.log`
-- **Rotation automatique** : Limitation de la taille des fichiers
-- **Niveaux configurables** : INFO, WARNING, ERROR selon l'environnement
+### Patterns de communication
+- **External clients → Kong Gateway** : HTTPS avec API Key/JWT
+- **Kong → Microservices** : HTTP avec load balancing
+- **Service-to-service** : HTTP direct pour performance
+- **Shared state** : Redis pour Cart Service instances
+- **Event-driven** : Future évolution pour consistency patterns
 
-### Métriques surveillées
-- **Performances des services** : Temps de réponse et erreurs
-- **Métriques métier** : Ventes, stocks, approvisionnements
-- **Alertes automatiques** : Ruptures critiques, échecs de synchronisation
+## Sécurité microservices
 
-## Containerisation
+**Choix : Kong centralized authentication**
 
-**Choix: Docker + Docker Compose**
+Justification :
+- **Single point of control** : Gestion auth centralisée
+- **Multiple auth methods** : API Key pour APIs, JWT pour clients
+- **Rate limiting** : Protection DDoS et fair usage
+- **CORS configuration** : Protection cross-origin attacks
+- **Audit logging** : Traçabilité complète des accès
 
-Justification:
-- Continuité avec l'infrastructure existante
-- Facilité de déploiement et de configuration
-- Isolation des dépendances
-- Portabilité entre différents environnements
-- Support multi-services (magasins, logistique, administration)
+### Stratégie de sécurité
+- **API Keys** : Pour applications externes et tests automatisés
+- **JWT tokens** : Pour authentification clients e-commerce
+- **HTTPS termination** : SSL/TLS au niveau Kong Gateway
+- **Network isolation** : Services backend non exposés directement
+- **Database security** : Credentials uniques per service
 
-### Architecture de conteneurs
-```
-- postgres: Base de données centralisée
-- web-admin: Interface web administrative (maison mère)
-- pos-magasin-1 à 5: Interfaces console par magasin
-- init-data: Initialisation des données multi-magasins
-```
+## Containerisation et orchestration
 
-## Documentation
+**Choix : Docker + Docker Compose** (évolué Lab 5)
 
-**Choix: Markdown + PlantUML**
+Justification :
+- **Isolation** : Containers indépendants per service
+- **Portabilité** : Environnements consistents dev → prod
+- **Resource management** : Allocation CPU/memory per service
+- **Service discovery** : Docker networks pour communication
+- **Health checks** : Monitoring intégré container-level
+- **Scalability** : Ready pour Kubernetes migration
 
-Justification:
-- Continuité avec la documentation existante
-- Format simple et lisible pour la documentation
-- PlantUML pour diagrammes UML (architecture 4+1)
-- Facilité de maintenance et de mise à jour
-- Intégration possible avec le versionnement de code
+### Architecture container Lab 5
+- **7 microservices** : Un container per service
+- **7 PostgreSQL** : Databases isolées per service
+- **1 Redis** : Cache partagé Cart Service
+- **Kong Gateway** : Container API gateway
+- **Prometheus + Grafana** : Monitoring stack
+- **Networks** : microservices-network isolé
 
-### Documentation produite
-- **ADR** : Décisions d'architecture
-- **Diagrammes UML** : Modèle 4+1 complet
-- **Guide utilisateur** : Interface web et console
-- **Documentation technique** : API et services
-- **Documentation des améliorations** : Performance, tests, logging
+### Ressources par container
+- **Microservices** : 512MB RAM, 0.5 CPU per service
+- **Databases** : 1GB RAM, 1 CPU per PostgreSQL
+- **Redis** : 512MB RAM (configured), 0.25 CPU
+- **Kong** : 1GB RAM, 1 CPU pour handling traffic
+- **Monitoring** : 2GB RAM total pour Prometheus + Grafana
 
-## Architecture
+## Tests et qualité
 
-**Choix: Architecture 3-tier avec pattern MVC** (évolution majeure)
+**Choix : Strategy microservices testing**
 
-### Évolution architecturale
-- **Lab 1** : Architecture 2-tier (client/serveur)
-- **Lab 2** : Architecture 3-tier avec MVC web
+### Pyramid testing microservices
+- **Unit tests** : Per service business logic (70%)
+- **Integration tests** : Database + API endpoints (20%)
+- **Contract tests** : API compatibility entre services (5%)
+- **End-to-end tests** : User journeys via Kong Gateway (5%)
 
-### Justification
-- **Séparation des responsabilités** : MVC pour interface web
-- **Réutilisation** : Services métier du Lab 1 deviennent le Model
-- **Évolutivité** : Préparation pour interfaces web avancées
-- **Maintenabilité** : Code modulaire et extensible
-- **Standards** : Respect des bonnes pratiques web
+### Tools de testing
+- **pytest** : Framework testing Python maintenu
+- **requests** : HTTP client pour integration tests
+- **testcontainers** : Database testing avec containers
+- **k6** : Load testing pour performance validation
+- **Postman/Newman** : API contract testing
 
-### Améliorations de qualité
+### Continuous testing
+- **Service-level CI** : Tests automatisés per service
+- **Contract validation** : API compatibility checks
+- **Performance regression** : SLA validation automated
+- **Security scanning** : Vulnerability assessment containers
 
-**Performance :**
-- Index de base de données pour les requêtes critiques
-- Optimisation des requêtes de rapports consolidés
-- Cache des données fréquemment consultées
+## Performance et scalabilité
 
-**Observabilité :**
-- Logging structuré dans tous les services
-- Métriques de performance et de santé
-- Alertes automatiques pour les situations critiques
+### Optimisations microservices
+- **Database indexing** : Index optimisés per service workload
+- **Connection pooling** : Réutilisation connexions database
+- **Response caching** : Kong-level caching pour GET requests
+- **Compression** : Gzip pour réduire network overhead
+- **Async processing** : Background jobs pour reports
 
-**Maintenabilité :**
-- Tests unitaires étendus pour les nouveaux services
-- Documentation technique mise à jour
-- Code simplifié et bien structuré
+### Scaling strategies
+- **Horizontal scaling** : Multiple instances per service
+- **Load balancing** : Kong upstream management
+- **Database read replicas** : Pour services read-heavy
+- **Cache scaling** : Redis cluster pour Cart Service
+- **CDN ready** : Static assets optimization
+
+### Performance targets Lab 5
+- **API latency** : < 200ms p95 single service calls
+- **E-commerce checkout** : < 2s end-to-end process
+- **Dashboard loading** : < 1s multi-service aggregation
+- **Throughput** : 1000+ concurrent users supported
+- **Availability** : 99.9% uptime avec health checks
+
+## DevOps et CI/CD
+
+### Deployment strategy
+- **Independent deployment** : Per service release cycles
+- **Blue-green deployment** : Zero-downtime updates
+- **Canary releases** : Gradual rollout risk mitigation
+- **Rollback capability** : Quick revert per service
+- **Health checks** : Automated deployment validation
+
+### Infrastructure as Code
+- **Docker Compose** : Local development + testing
+- **Environment config** : Variables per service/environment
+- **Secret management** : Secure credential handling
+- **Backup automation** : Database backup strategies
+- **Log aggregation** : Centralized logging solution
+
+## Migration path et évolutivité
+
+### Kubernetes readiness
+- **Microservices** : Container-ready pour K8s migration
+- **Service mesh** : Istio integration potential
+- **Auto-scaling** : HPA ready avec métriques Prometheus
+- **Service discovery** : K8s native service discovery
+- **Ingress controller** : Kong Ingress Controller available
+
+### Cloud-native features
+- **12-factor app** : Microservices suivent best practices
+- **Stateless design** : Shared state via Redis external
+- **Configuration externalization** : Environment-based config
+- **Health endpoints** : Kubernetes health probes ready
+- **Graceful shutdown** : SIGTERM handling per service
+
+## Conclusion
+
+L'architecture microservices Lab 5 avec Kong Gateway représente une évolution mature vers un système cloud-native, scalable et résilient, prêt pour production e-commerce avec support legacy POS intégré. 

@@ -1,327 +1,352 @@
-# Architecture du Système Multi-Magasins - Modèle 4+1
+# Architecture du Système Microservices - Modèle 4+1
 
 ## Vue Logique
 
-La vue logique représente les classes principales et leurs relations dans l'architecture multi-magasins.
+La vue logique représente l'architecture microservices avec 7 services indépendants et leurs interactions via Kong Gateway.
 
-### Diagramme de classes
+### Diagramme de classes microservices
 
-![Diagramme de Classes](uml/images/classes.png)
+![Diagramme de Classes Microservices](uml/images/classes.png)
 
-### Évolution du modèle (Lab 1 → Lab 2 → Lab 3)
+### Architecture microservices (Evolution Lab 1 → Lab 5)
 
-**Nouvelles entités :**
-- **Magasin** : Représente un magasin de l'entreprise
-- **CentreLogistique** : Gestion centralisée des stocks
-- **MaisonMere** : Entité administrative centrale
-- **DemandeApprovisionnement** : Demandes de réapprovisionnement
-- **Rapport** : Rapports consolidés générés
+**Lab 1-3 : Architecture monolithique**
+- Base de données centralisée unique
+- Services métier partagés dans un seul processus
+- Interface web MVC simple
 
-**Entités étendues :**
-- **Produit** : Ajout de seuils d'alerte et gestion multi-magasins
-- **Stock** : Gestion par magasin et centre logistique
-- **Vente** : Association avec un magasin spécifique
+**Lab 5 : Architecture microservices**
+- **7 microservices autonomes** : Product, Customer, Cart, Order, Inventory, Sales, Reporting
+- **Database per Service** : 7 PostgreSQL + 1 Redis (isolation des données)
+- **Kong API Gateway** : Point d'entrée unique avec load balancing
+- **Load balancing** : 3 instances de Cart Service avec failover automatique
 
-### Services métier étendus
+### Services microservices détaillés
 
-**Services existants (réutilisés) :**
-- **ServiceProduit** : Recherche de produits (étendu multi-magasins)
-- **ServiceVente** : Gestion des ventes par magasin
-- **ServiceInventaire** : Gestion des stocks multi-entités
-- **ServiceTransaction** : Transactions distribuées
+**Product Service (Port 8001)**
+- **Responsabilité** : Catalogue produits et catégories
+- **Base de données** : PostgreSQL (product_db)
+- **APIs** : CRUD produits, recherche, gestion catégories
+- **Bounded Context** : Product Catalog
 
-**Nouveaux services :**
-- **ServiceApprovisionnement** : Gestion des demandes et transferts
-- **ServiceTableauBord** : Indicateurs de performance pour supervision web
+**Customer Service (Port 8005)**
+- **Responsabilité** : Gestion clients e-commerce
+- **Base de données** : PostgreSQL (customer_db)
+- **APIs** : Inscription, authentification JWT, profils, adresses
+- **Bounded Context** : Customer Management
 
-### Architecture 3-interfaces
+**Cart Service (Port 8006 - Load Balanced)**
+- **Responsabilité** : Panier d'achat avec session persistence
+- **Base de données** : Redis cache (cart_cache)
+- **APIs** : Gestion panier, calcul taxes, session management
+- **Load Balancing** : 3 instances avec Kong upstream
 
-**Interface Console (Opérationnelle) :**
-- Réutilisation des services métier du Lab 1
-- Extension pour UC1 (rapports), UC2 (stock central), UC4 (produits), UC6 (approvisionnement)
-- Adaptée selon le type d'entité (MAGASIN, CENTRE_LOGISTIQUE, MAISON_MERE)
+**Order Service (Port 8007)**
+- **Responsabilité** : Commandes e-commerce et checkout
+- **Base de données** : PostgreSQL (order_db)
+- **APIs** : Processus checkout, gestion commandes, tracking
+- **Bounded Context** : Order Management
 
-**Interface Web (Supervision) :**
-- Templates HTML minimalistes
-- UC3 (tableau de bord) et UC8 (supervision légère)
-- Aucune fonctionnalité opérationnelle
+**Inventory Service (Port 8002)**
+- **Responsabilité** : Stocks multi-locations (magasins + e-commerce)
+- **Base de données** : PostgreSQL (inventory_db)
+- **APIs** : Gestion stocks, réservations, transferts, alertes
+- **Bounded Context** : Inventory Management
 
-**Interface API REST (Intégrations) :**
-- Flask-RESTX avec documentation Swagger automatique
-- Architecture Domain-Driven pour organisation métier structurée
-- UC1-UC4 exposés via endpoints RESTful
-- Authentification Bearer token et CORS configuré
-- Standards REST avec HATEOAS et pagination
+**Sales Service (Port 8003)**
+- **Responsabilité** : Ventes POS magasins physiques
+- **Base de données** : PostgreSQL (sales_db)
+- **APIs** : Transactions POS, encaissement, retours
+- **Bounded Context** : POS Sales
+
+**Reporting Service (Port 8004)**
+- **Responsabilité** : Analytics et rapports multi-canaux
+- **Base de données** : PostgreSQL (reporting_db)
+- **APIs** : Rapports consolidés, dashboard, métriques performance
+- **Bounded Context** : Business Intelligence
 
 ## Vue des processus
 
-### Diagrammes de séquence
+### Diagrammes de séquence microservices
 
-#### UC1 - Génération de rapport consolidé (Console)
+#### Processus e-commerce complet (Customer → Product → Cart → Order)
 
-![Diagramme de Séquence - Rapport](uml/images/sequence_rapport.png)
+![Diagramme de Séquence - E-commerce Checkout](uml/images/sequence_vente.png)
 
-#### UC3 - Tableau de bord supervision (Web)
+#### Agrégation de données reporting multi-services
 
-![Diagramme de Séquence - Tableau de Bord](uml/images/sequence_tableau_bord.png)
+![Diagramme de Séquence - Reporting Dashboard](uml/images/sequence_rapport.png)
 
-#### Processus de vente multi-magasins
+#### Load balancing avec failover automatique
 
-![Diagramme de Séquence - Vente](uml/images/sequence_vente.png)
+![Diagramme de Séquence - Cart Load Balancing](uml/images/sequence_tableau_bord.png)
 
-### Processus principaux
+### Processus clés microservices
 
-1. **Processus de vente en magasin** (hérité du Lab 1)
-2. **Processus de génération de rapports** (console maison mère + API REST)
-3. **Processus de demande et validation d'approvisionnement** (console)
-4. **Processus de supervision via tableau de bord** (web)
-5. **Processus d'intégration externe via API** (applications tierces)
+1. **Processus d'authentification client** (Customer Service → Kong JWT)
+2. **Processus de navigation produits** (Product Service via Kong)
+3. **Processus de gestion panier** (Cart Service load-balanced avec Redis)
+4. **Processus de checkout e-commerce** (Order Service + validation multi-services)
+5. **Processus POS traditionnel** (Sales Service + Inventory validation)
+6. **Processus de reporting multi-canaux** (Reporting Service + agrégation)
 
-### Nouveaux flux API REST
+### Communication inter-services
 
-- **Consultation asynchrone des stocks** via `GET /api/v1/stocks`
-- **Génération de rapports programmée** via `POST /api/v1/reports/sales/consolidated`
-- **Synchronisation des produits** via `PUT/DELETE /api/v1/products/{id}`
-- **Monitoring des performances** via `GET /api/v1/stores/performances`
+- **Synchrone via Kong Gateway** : Toutes les API calls externes
+- **Service-to-service** : HTTP REST via réseau microservices interne
+- **Event-driven** : Events pour cohérence data cross-services
+- **Shared cache** : Redis pour état partagé Cart Service instances
 
 ## Vue de déploiement
 
-La vue de déploiement montre l'architecture 3-tier distribuée pour le système multi-magasins.
+La vue de déploiement montre l'architecture microservices distribuée avec Kong Gateway.
 
-![Diagramme de Déploiement](uml/images/deploiement.png)
+![Diagramme de Déploiement Microservices](uml/images/deploiement.png)
 
-### Architecture 3-tier distribuée
+### Architecture microservices distribuée
 
-**Tier 1 - Base de données (Persistance) :**
-- PostgreSQL centralisé pour toutes les entités
-- Gestion des données consolidées
-- Transactions distribuées ACID
-- **Index de performance** pour optimiser les requêtes fréquentes
+**Kong API Gateway Layer**
+- **Kong Gateway** (Port 8080) : Point d'entrée unique
+- **Features** : Authentication (API Key + JWT), Rate limiting, CORS, Load balancing
+- **Upstream management** : Health checks, failover, circuit breaker
+- **Monitoring** : Métriques Kong, admin API
 
-**Tier 2 - Services métier (Logique) :**
-- Services métier centralisés
-- API de synchronisation entre entités
-- Gestion des règles métier multi-magasins
-- **Logging centralisé** pour traçabilité et débogage
+**Microservices Layer**
+- **7 services indépendants** avec isolation complète
+- **Service discovery** : Kong routes configuration
+- **Health monitoring** : Health checks automatiques
+- **Load balancing** : Cart Service avec 3 instances actives
 
-**Tier 3 - Présentation :**
-- **Interface console** : Fonctionnalités opérationnelles (UC1, UC2, UC4, UC6 + POS Lab1)
-- **Interface web** : Supervision légère uniquement (UC3, UC8)
-- **API REST** : Intégrations externes (UC1-UC4 via endpoints RESTful)
+**Data Layer**
+- **Database per Service** : 7 PostgreSQL databases isolées
+- **Shared cache** : Redis pour Cart Service session state
+- **Data consistency** : Event-driven synchronization
+- **Backup strategy** : Individual service data protection
 
-### Entités déployées
+**Observability Stack**
+- **Prometheus** (Port 9090) : Métriques collection
+- **Grafana** (Port 3000) : Dashboards et visualisation
+- **Kong Admin API** : Gateway monitoring et configuration
 
-**API REST Server :**
-- Flask-RESTX sur port 8000
-- Documentation Swagger UI accessible via `/api/docs`
-- Authentification Bearer token
-- CORS configuré pour localhost:3000,5000
-- Bounded contexts pour organisation métier structurée
+### Optimisations de performance microservices
 
-**Magasins (5 instances) :**
-- Interface console pour ventes (Lab 1) + consultation stock central (UC2)
-- Connexion aux services centralisés
+**Kong Gateway optimizations**
+- **Connection pooling** : Réutilisation connexions vers services
+- **Response caching** : Cache responses fréquentes
+- **Rate limiting** : 100 req/min, 1000 req/hour protection
+- **Compression** : Gzip pour réduire bandwidth
 
-**Centre logistique :**
-- Interface console pour traitement des demandes d'approvisionnement (UC6)
+**Service-level optimizations**
+- **Database indexing** : Index optimisés per service
+- **Redis caching** : Session state avec expiration
+- **Connection pooling** : Pool connections entre services
+- **Async processing** : Background jobs pour reports
 
-**Maison mère :**
-- Interface console pour génération de rapports (UC1) et gestion produits (UC4)
-- Interface web pour supervision (UC3, UC8)
-
-### Optimisations de performance
-
-**Index de base de données (optimisés) :**
-- **Index composite ventes** : `idx_vente_entite_date` pour les rapports consolidés (requête critique)
-- **Index composite stocks** : `idx_stock_entite_produit` pour la consultation des stocks par entité
-- **Index recherche produits** : `idx_produit_nom` pour la recherche de produits par nom
-- **Index demandes** : `idx_demande_statut` pour filtrer les demandes d'approvisionnement
-
-**Stratégies de cache :**
-- Cache des indicateurs de performance (rafraîchissement périodique)
-- Cache des données de référence (produits, entités)
-- Cache API pour réduire la charge sur les services métier
+**Load balancing strategies**
+- **Least connections** : Distribution optimale Cart Service
+- **Health checks** : Détection automatique pannes (15s)
+- **Circuit breaker** : Protection cascade failures
+- **Graceful degradation** : Fallback strategies
 
 ## Vue d'implémentation
 
-La vue d'implémentation montre l'organisation du code avec l'architecture MVC.
+La vue d'implémentation montre l'organisation microservices avec séparation bounded contexts.
 
-![Diagramme de Composants](uml/images/composants.png)
+![Diagramme de Composants Microservices](uml/images/composants.png)
 
-### Organisation des modules
+### Organisation microservices
 
-**Couche Domaine (Model - réutilisée) :**
-- `src/domain/entities.py` : Entités métier étendues
-- `src/domain/services.py` : Services métier étendus avec logging
+**Service Autonomy**
+- **Separate codebases** : Un repository par service
+- **Independent deployment** : Deploy cycles indépendants
+- **Technology diversity** : Stack technique adaptée per service
+- **Team ownership** : Équipes dédiées par bounded context
 
-**Couche Persistance (réutilisée et étendue) :**
-- `src/persistence/models.py` : Modèles SQLAlchemy étendus avec index
-- `src/persistence/repositories.py` : Repositories étendus
+**Kong Gateway Components**
+- **Route Management** : Configuration centralisée routing
+- **Plugin Ecosystem** : Authentication, rate limiting, CORS, logging
+- **Upstream Management** : Load balancing et health monitoring
+- **Admin API** : Configuration et monitoring Kong
 
-**Couche Présentation Console (étendue) :**
-- `src/client/console.py` : Interface console adaptée par type d'entité
-- Fonctionnalités opérationnelles complètes (UC1, UC2, UC4, UC6)
+**Cross-cutting Concerns**
+- **Event Bus** : Communication asynchrone inter-services
+- **Metrics Collection** : Prometheus scraping tous services
+- **Centralized Logging** : Aggregation logs avec correlation IDs
+- **Configuration Management** : Environment variables per service
 
-**Couche Web Supervision :**
-- `src/web/app.py` : Application Flask minimaliste (4 routes)
-- `src/web/templates/` : Templates HTML légers (index.html, dashboard.html)
+### Structure par service
 
-**Couche API REST :**
-- `src/api/app.py` : Application Flask-RESTX avec configuration Swagger
-- `src/api/endpoints/` : Endpoints REST organisés par domaine
-- `src/api/bounded_contexts/` : Architecture Domain-Driven pour l'API
-  - `product_catalog/` : Bounded context avec Aggregates, Value Objects et Domain Services
-  - `shared/` : Value Objects et Domain Events partagés
-- `src/api/models.py` : Modèles de documentation Swagger/OpenAPI
-- `src/api/auth.py` : Système d'authentification Bearer token
-- `src/api/error_handlers.py` : Gestion standardisée des erreurs
+**Standard microservice structure**
+```
+service/
+├── app.py              # Flask application
+├── models/             # Database models
+├── services/           # Business logic
+├── api/               # REST endpoints
+├── database.py        # Database configuration
+├── requirements.txt   # Dependencies
+├── Dockerfile         # Container image
+└── tests/             # Service tests
+```
 
-### Qualité et observabilité
+**Kong Gateway structure**
+```
+api-gateway/
+├── kong.yml          # Kong configuration
+├── openapi.yml       # API documentation
+└── plugins/          # Custom plugins
+```
 
-**Tests :**
-- Tests unitaires pour les nouveaux services (`tests/test_services.py`)
-- Tests automatisés API REST (`tests/test_api_rest.py`)
-- Tests d'intégration pour les workflows multi-magasins
-- Tests de performance pour les requêtes critiques
+### Qualité et observabilité microservices
 
-**Logging :**
-- Logs applicatifs dans `logs/pos_multimagasins.log`
-- Logs des services métier dans `logs/services.log`
-- Logs API REST dans `logs/pos_api.log`
-- Rotation automatique des fichiers de logs
-- Niveaux de log configurables (INFO, WARNING, ERROR)
+**Testing strategies**
+- **Unit tests** : Per service business logic
+- **Integration tests** : Database et API endpoints
+- **Contract tests** : API compatibility entre services
+- **End-to-end tests** : Workflows complets via Kong
+- **Load tests** : Performance testing avec k6
 
-**Métriques :**
-- Métriques de performance des services
-- Métriques API REST (temps de réponse, codes d'erreur)
-- Indicateurs de santé du système
-- Alertes automatiques pour les situations critiques
+**Monitoring et métriques**
+- **Service health** : Health checks Kong + Prometheus
+- **Performance metrics** : Response times, throughput, errors
+- **Business metrics** : Order conversion, cart abandonment
+- **Infrastructure metrics** : CPU, memory, database performance
+
+**Logging stratégique**
+- **Structured logging** : JSON format avec correlation IDs
+- **Centralized aggregation** : ELK stack ou équivalent
+- **Request tracing** : Suivi requests cross-services
+- **Error tracking** : Alerts automatiques sur erreurs critiques
 
 ## Vue des cas d'utilisation
 
-La vue des cas d'utilisation décrit les scénarios du système multi-magasins.
+La vue des cas d'utilisation décrit les scénarios e-commerce et POS via microservices.
 
-### Cas d'utilisation principaux
+![Diagramme des Cas d'Utilisation Microservices](uml/images/cas_utilisation.png)
 
-![Diagramme des Cas d'Utilisation](uml/images/cas_utilisation.png)
+### Acteurs et microservices
 
-### Acteurs et cas d'utilisation
+**Client E-commerce**
+- Navigation catalogue (Product Service)
+- Gestion compte (Customer Service)
+- Panier shopping (Cart Service load-balanced)
+- Commandes et checkout (Order Service)
+- Suivi commandes (Order Service)
 
-**Employé Magasin :**
-- Effectuer une vente (hérité Lab 1) - Console
-- Consulter stock central (UC2) - Console
+**Employé Magasin**
+- Ventes POS (Sales Service)
+- Consultation stocks (Inventory Service)
+- Gestion retours (Sales Service)
+- Encaissement (Sales Service)
 
-**Responsable Logistique :**
-- Traiter demandes d'approvisionnement (UC6) - Console
+**Gestionnaire/Admin**
+- Gestion produits (Product Service)
+- Analytics et rapports (Reporting Service)
+- Gestion commandes (Order Service)
+- Supervision stocks (Inventory Service)
 
-**Gestionnaire Maison Mère :**
-- Générer rapports consolidés (UC1) - Console
-- Gérer produits (UC4) - Console
-- Consulter tableau de bord (UC3) - Web
-- Supervision légère (UC8) - Web
+**Applications Mobiles/Externes**
+- APIs complètes via Kong Gateway
+- Authentification API Key
+- Rate limiting et sécurité
+- Documentation OpenAPI
 
-**Application Externe :**
-- Consulter rapports consolidés (UC1) - API REST
-- Consulter stocks par magasin (UC2) - API REST
-- Monitorer performances magasins (UC3) - API REST
-- Gérer produits programmatiquement (UC4) - API REST
+### Workflows microservices clés
 
-**Système :**
-- Maintenir cohérence des données
-- Calcul des indicateurs de performance
+**E-commerce Checkout Flow**
+1. **Authentication** : Customer Service (JWT)
+2. **Product Browse** : Product Service (catalog)
+3. **Cart Management** : Cart Service (load-balanced Redis)
+4. **Stock Validation** : Inventory Service (reservation)
+5. **Order Creation** : Order Service (checkout processing)
+6. **Payment Processing** : Order Service (gateway integration)
 
-### Évolution des cas d'utilisation
+**POS Sales Flow**
+1. **Product Lookup** : Product Service (catalog search)
+2. **Stock Validation** : Inventory Service (availability)
+3. **Sale Processing** : Sales Service (transaction)
+4. **Payment** : Sales Service (cash/card)
+5. **Receipt** : Sales Service (printing)
 
-**Maintenus du Lab 1 :**
-- Rechercher un produit
-- Enregistrer une vente
-- Gérer les retours
-- Consulter le stock local
+**Reporting Analytics Flow**
+1. **Data Aggregation** : Reporting Service calls multiple services
+2. **POS Data** : Sales Service (transactions)
+3. **E-commerce Data** : Order Service (orders)
+4. **Inventory Data** : Inventory Service (stock levels)
+5. **Dashboard Generation** : Reporting Service (metrics)
 
-**Maintenus du Lab 2 :**
-- UC1, UC2, UC4, UC6 : Fonctionnalités opérationnelles (console)
-- UC3, UC8 : Supervision légère (web)
-- Gestion multi-magasins
-- Séparation claire des responsabilités interfaces
+## Aspects non-fonctionnels microservices
 
-**Extension Lab 3 :**
-- UC1-UC4 : Exposition via API REST pour intégrations externes
-- Documentation interactive Swagger
-- Authentification sécurisée pour applications tierces
-- Standards RESTful avec pagination et HATEOAS
+### Performance et scalabilité
 
-## Philosophie architecturale
+**Horizontal scaling**
+- **Service scaling** : Scale individual services based on load
+- **Database scaling** : Read replicas per service
+- **Cache scaling** : Redis cluster pour Cart Service
+- **Load balancer scaling** : Kong Gateway clustering
 
-### Séparation des responsabilités
+**Performance targets**
+- **API Response** : < 200ms p95 pour calls simples
+- **E-commerce Checkout** : < 2s end-to-end
+- **Dashboard Load** : < 1s aggregation multi-services
+- **Throughput** : 1000+ concurrent users supported
 
-**Interface Console - Opérationnelle :**
-- **Responsabilité** : Toutes les fonctionnalités métier et opérationnelles
-- **Utilisateurs** : Employés, responsables, gestionnaires dans leurs tâches quotidiennes
-- **Fonctions** : UC1 (rapports), UC2 (stock central), UC4 (produits), UC6 (approvisionnement) + Lab1
-- **Avantages** : Interface riche, adaptée à chaque type d'entité, performance optimale
+### Résilience et disponibilité
 
-**Interface Web - Supervision :**
-- **Responsabilité** : Supervision légère et accès distant
-- **Utilisateurs** : Gestionnaires pour supervision rapide
-- **Fonctions** : UC3 (tableau de bord), UC8 (interface légère)
-- **Avantages** : Accès distant, visualisation simple, maintenance réduite
+**Fault tolerance**
+- **Circuit breaker** : Protection cascade failures
+- **Retry logic** : Automatic retry avec backoff
+- **Timeouts** : Configured per service interaction
+- **Graceful degradation** : Fallback strategies
 
-**Interface API REST - Intégrations :**
-- **Responsabilité** : Intégrations externes et accès programmatique
-- **Utilisateurs** : Applications tierces, systèmes ERP, applications mobiles
-- **Fonctions** : UC1-UC4 via endpoints RESTful standardisés
-- **Avantages** : Standards REST, documentation automatique, authentification sécurisée
+**High availability**
+- **Service redundancy** : Multiple instances per service
+- **Database failover** : PostgreSQL replication
+- **Load balancer HA** : Kong Gateway clustering
+- **Geographic distribution** : Multi-region deployment ready
 
-### Principe de complémentarité
+### Sécurité microservices
 
-Les trois interfaces sont **complémentaires** et non concurrentes :
-- **Console** : Interface principale pour les opérations quotidiennes
-- **Web** : Accès rapide pour supervision à distance
-- **API REST** : Pont vers l'écosystème externe sans perturbation interne
+**Authentication et authorization**
+- **API Gateway security** : Kong centralized auth
+- **JWT tokens** : Customer authentication
+- **API Keys** : External application access
+- **mTLS** : Service-to-service communication
+- **RBAC** : Role-based access per service
 
-## Aspects non-fonctionnels
+**Data protection**
+- **Database encryption** : At-rest et in-transit
+- **PCI compliance** : Payment data protection
+- **GDPR compliance** : Customer data privacy
+- **Audit logging** : Security events tracking
 
-### Performance
+### Monitoring et observabilité
 
-**Optimisations base de données :**
-- Index composites pour les requêtes multi-critères
-- Requêtes optimisées pour les rapports consolidés
-- Pagination pour les grandes listes
+**Three pillars of observability**
+- **Metrics** : Prometheus + Grafana (business + technical)
+- **Logging** : Structured logging avec correlation IDs
+- **Tracing** : Distributed tracing cross-services
 
-**Optimisations applicatives :**
-- Cache des données fréquemment consultées
-- Traitement asynchrone pour les rapports volumineux
-- Compression des réponses HTTP
+**Alerting strategy**
+- **Service health** : Immediate alerts on service down
+- **Performance degradation** : Response time thresholds
+- **Business metrics** : Order conversion rate drops
+- **Infrastructure** : Resource utilization limits
 
-### Observabilité
+### DevOps et déploiement
 
-**Logging structuré :**
-- Logs au format standardisé avec contexte
-- Corrélation des logs entre services
-- Logs API REST séparés pour analyse
-- Niveaux de log appropriés selon l'environnement
+**CI/CD pipeline**
+- **Independent deployment** : Per service deployment
+- **Blue-green deployment** : Zero-downtime updates
+- **Canary releases** : Gradual rollout nouvelles versions
+- **Rollback strategy** : Quick rollback per service
 
-**Métriques métier :**
-- Nombre de ventes par magasin
-- Temps de réponse des services critiques
-- Métriques API REST (appels, codes d'erreur)
-- Indicateurs de performance du tableau de bord
+**Infrastructure as Code**
+- **Docker containers** : Consistent environments
+- **Docker Compose** : Local development et testing
+- **Kubernetes ready** : Production orchestration
+- **Infrastructure automation** : Terraform pour cloud deployment
 
-**Monitoring :**
-- Santé des services métier
-- Performance des requêtes base de données
-- Disponibilité interfaces console, web et API REST
-- Health check API : `/api/health`
+## Conclusion
 
-### Maintenabilité
-
-**Tests automatisés :**
-- Couverture des services critiques
-- Tests d'intégration pour les workflows
-- Tests de régression pour les évolutions
-
-**Documentation :**
-- Documentation technique à jour
-- Documentation API interactive (Swagger UI)
-- Guides d'utilisation pour les interfaces
-- Procédures de déploiement et maintenance
+L'architecture microservices Lab 5 représente une évolution majeure vers un système distribué, scalable et résilient, optimisé pour un contexte e-commerce moderne avec support POS legacy. Kong Gateway assure une gouvernance API centralisée tout en permettant l'autonomie des services.

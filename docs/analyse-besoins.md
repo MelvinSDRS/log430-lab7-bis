@@ -1,162 +1,338 @@
-# Analyse des besoins - Système multi-magasins
+# Analyse des Besoins - Système Microservices POS + E-commerce Lab 5
 
-## Évolution des besoins (Lab 1 → Lab 2 → Lab 3)
+## Contexte métier
 
-### Contexte initial (Lab 1)
-Système de point de vente pour un magasin avec 3 caisses simultanées.
+### Évolution architecturale (Lab 1 → Lab 5)
 
-### Extension Lab 2
-Entreprise avec 5 magasins, 1 centre logistique et 1 maison mère nécessitant :
-- Gestion simultanée et cohérente de plusieurs magasins
-- Consultation centralisée des stocks et transactions
-- Synchronisation fiable des données
-- Rapports consolidés pour l'administration
-- Interface web pour supervision
+**Lab 1-3 : Architecture monolithique**
+- Système POS traditionnel avec base centralisée
+- Interface console pour employés magasins
+- Extension API REST pour intégrations
 
-### Extension Lab 3 (API REST)
-Exposition des fonctionnalités via API REST pour applications externes :
-- Intégration avec systèmes tiers (ERP, applications mobiles, etc.)
-- Accès programmatique aux données et fonctionnalités
-- Documentation standardisée (Swagger/OpenAPI)
-- Authentification sécurisée pour applications externes
+**Lab 5 : Architecture microservices distribuée** 
+- **Hybridation POS + E-commerce** : Support dual-channel unifié
+- **7 microservices autonomes** : Product, Customer, Cart, Order, Inventory, Sales, Reporting
+- **Kong API Gateway** : Point d'entrée unique avec load balancing
+- **Scalabilité cloud-native** : Architecture prête pour production
 
-## Besoins fonctionnels (MoSCoW)
+### Vision métier Lab 5
 
-### Must Have (Essentiel)
+L'entreprise opère un **écosystème commercial hybride** intégrant :
+- **Magasins physiques** : Ventes POS traditionnelles
+- **E-commerce** : Plateforme vente en ligne
+- **Omnicanalité** : Expérience client unifiée cross-canal
+- **Analytics temps réel** : Business intelligence consolidée
 
-**UC1 – Générer un rapport consolidé des ventes**
-- **Acteur** : Gestionnaire maison mère / Application externe
-- **Description** : Génère un rapport détaillé contenant les ventes par magasin, produits les plus vendus, et stocks restants
-- **Objectif** : Planification et décisions stratégiques
-- **Statut** : ✅ Implémenté (interface console + API REST `/api/v1/reports/sales/consolidated`)
+## Besoins fonctionnels microservices
 
-**UC2 – Consulter le stock central et déclencher un réapprovisionnement**
-- **Acteur** : Employé magasin / Application externe
-- **Description** : Consulte le stock du centre logistique et initie une demande d'approvisionnement
-- **Objectif** : Éviter les ruptures de stock locales
-- **Statut** : ✅ Implémenté (interface console + API REST `/api/v1/stocks`)
+### 1. Product Service - Catalogue Unifié
 
-**UC3 – Visualiser les performances des magasins dans un tableau de bord**
-- **Acteur** : Gestionnaire maison mère / Application externe
-- **Description** : Accède à un tableau de bord avec indicateurs clés (CA par magasin, alertes rupture, surstock, tendances)
-- **Objectif** : Supervision en temps réel
-- **Statut** : ✅ Implémenté (interface web + API REST `/api/v1/stores/performances`)
+**Responsabilité** : Gestion centralisée du catalogue produits cross-canal
 
-### Should Have (Souhaitable)
+**Besoins métier** :
+- **Catalogue unifié** : Même référentiel produits POS + E-commerce
+- **Catégorisation hiérarchique** : Navigation e-commerce + recherche POS
+- **Gestion prix dynamique** : Promotions, discounts, pricing rules
+- **Attributs produits étendus** : Descriptions, images, variantes, options
+- **Search engine** : Recherche full-text performante
 
-**UC4 – Mettre à jour les produits depuis la maison mère**
-- **Acteur** : Responsable maison mère / Application externe
-- **Description** : Modifie les informations d'un produit (nom, prix, description, catégorie, seuil). Les changements sont synchronisés automatiquement dans tous les magasins
-- **Objectif** : Cohérence des données produits
-- **Statut** : ✅ Implémenté (interface console + API REST `/api/v1/products`)
+**Cas d'usage** :
+- Consultation catalogue e-commerce via interface web
+- Recherche produits POS via code-barres/nom
+- Gestion catalogue admin via Kong Gateway
+- Synchronisation prix/promotions temps réel
 
-**UC6 – Approvisionner un magasin depuis le centre logistique**
-- **Acteur** : Responsable logistique
-- **Description** : Valide une commande de réapprovisionnement avec transfert de stock
-- **Objectif** : Gestion optimisée des stocks
-- **Statut** : ✅ Implémenté (interface console depuis centre logistique)
+**APIs exposées** :
+- `GET /api/v1/products` : Liste produits avec pagination
+- `GET /api/v1/products/{id}` : Détail produit
+- `POST /api/v1/products/search` : Recherche full-text
+- `GET /api/v1/categories` : Arborescence catégories
 
-### Could Have (Facultatif)
+### 2. Customer Service - Gestion Clients E-commerce
 
-**UC7 – Détecter les ruptures critiques**
-- **Acteur** : Système
-- **Description** : Détecte et affiche les ruptures de stock dans les rapports et tableaux de bord
-- **Objectif** : Visibilité sur les ruptures
-- **Statut** : ⚠️ Partiellement implémenté (détection + affichage, pas d'alertes automatiques)
+**Responsabilité** : Authentification et profils clients e-commerce
 
-**UC8 – Interface web minimale pour gestionnaires**
-- **Acteur** : Gestionnaire
-- **Description** : Interface web légère pour accès à distance aux indicateurs clés du système : ventes, stocks, alertes
-- **Objectif** : Visibilité rapide sans accès direct au système interne
-- **Statut** : ✅ Implémenté (interface web légère)
+**Besoins métier** :
+- **Inscription/authentification** : Comptes clients sécurisés
+- **Profils clients** : Informations personnelles, préférences
+- **Gestion adresses** : Livraison et facturation
+- **Historique clients** : Commandes, interactions, support
+- **Fidélisation** : Programme de points, niveaux VIP
 
-## Besoins non-fonctionnels
+**Cas d'usage** :
+- Inscription nouveau client e-commerce
+- Authentification JWT pour sessions sécurisées
+- Gestion profil client (modification adresses, préférences)
+- Consultation historique commandes
 
-### Performance ✅
-- Support de 5 magasins simultanés + centre logistique
-- Synchronisation des données en temps quasi-réel
-- Interface web responsive
-- API REST avec pagination et filtrage
+**APIs exposées** :
+- `POST /api/v1/customers/register` : Inscription client
+- `POST /api/v1/customers/auth` : Authentification JWT
+- `GET /api/v1/customers/{id}/profile` : Profil client
+- `PUT /api/v1/customers/{id}/addresses` : Gestion adresses
 
-### Fiabilité ✅
-- Cohérence des données entre toutes les entités
-- Gestion des sessions de base de données
-- Gestion d'erreurs avec rollback
-- Validation des données API avec messages d'erreur standardisés
+### 3. Cart Service - Panier E-commerce Load-Balanced
 
-### Sécurité ⚠️
-- API REST : Authentification Bearer token (`pos-api-token-2025`)
-- API REST : Configuration CORS restrictive
-- **Non implémenté** : Authentification des utilisateurs console/web
-- **Non implémenté** : Autorisation basée sur les rôles
+**Responsabilité** : Gestion panier shopping avec haute disponibilité
 
-### Maintenabilité ✅
-- Architecture MVC pour séparation des responsabilités
-- Code modulaire et extensible
-- Documentation ADR complète
-- Documentation API automatique (Swagger/OpenAPI)
+**Besoins métier** :
+- **Session management** : Panier persistant cross-sessions
+- **Calculs temps réel** : Prix, taxes, frais livraison, promotions
+- **High availability** : 3 instances avec load balancing Kong
+- **Session stickiness** : Via Redis cache partagé
+- **Abandon cart recovery** : Notifications clients paniers abandonnés
 
-### Évolutivité ✅
-- Architecture préparée pour extensions futures
-- Possibilité d'ajouter de nouveaux magasins
-- Structure modulaire des services
-- API versionnée (`/api/v1/`)
+**Cas d'usage** :
+- Ajout/suppression produits panier e-commerce
+- Calcul total avec taxes et frais automatique
+- Persistance panier entre sessions client
+- Load balancing transparent avec failover
 
-### Portabilité ✅
-- Déploiement via conteneurisation Docker
-- Fonctionnement multi-plateforme
-- Base de données PostgreSQL standard
-- API REST standard (Flask-RESTX)
+**APIs exposées** :
+- `POST /api/v1/cart/items` : Ajout produit panier
+- `GET /api/v1/cart/{session_id}` : Consultation panier
+- `PUT /api/v1/cart/{session_id}/calculate` : Calcul totaux
+- `DELETE /api/v1/cart/{session_id}` : Vider panier
 
-## Répartition des interfaces
+### 4. Order Service - Commandes E-commerce
 
-### Interface Console
-**Fonctionnalités opérationnelles et de gestion :**
-- **UC1** - Génération de rapports (maison mère)
-- **UC2** - Consultation stock central + demandes approvisionnement (magasins)
-- **UC4** - Gestion des produits (maison mère)
-- **UC6** - Traitement des demandes d'approvisionnement (centre logistique)
-- Fonctionnalités POS existantes (Lab 1)
+**Responsabilité** : Processus checkout et gestion commandes
 
-### Interface Web
-**Supervision légère à distance uniquement :**
-- **UC3** - Tableau de bord avec indicateurs clés
-- **UC8** - Interface minimaliste pour accès distant
-- Aucune fonction opérationnelle (pas de formulaires de gestion)
+**Besoins métier** :
+- **Checkout workflow** : Validation, paiement, confirmation
+- **Gestion commandes** : États, tracking, modifications
+- **Integration payment** : Gateways paiement sécurisés
+- **Order fulfillment** : Préparation, expédition, livraison
+- **Customer notifications** : Email confirmations, SMS tracking
 
-### Interface API REST
-**Intégrations et applications externes :**
-- **UC1** - Rapports consolidés via `POST /api/v1/reports/sales/consolidated`
-- **UC2** - Consultation stocks via `GET /api/v1/stocks?store_id=X`
-- **UC3** - Performances magasins via `GET /api/v1/stores/performances`
-- **UC4** - Gestion produits via `GET/POST/PUT/DELETE /api/v1/products`
-- Architecture DDD pour logique métier structurée
-- Documentation interactive via Swagger UI (`/api/docs`)
-- Authentification Bearer token sécurisée
+**Cas d'usage** :
+- Processus checkout complet e-commerce
+- Validation stock avant confirmation commande
+- Suivi commandes client (statuts, tracking)
+- Gestion retours et remboursements
 
-### Justification de cette répartition
-Cette approche respecte l'esprit du sujet original où l'interface web était destinée à être **légère** et **complémentaire**. L'API REST ajoute une troisième dimension pour les intégrations externes avec une architecture métier structurée sans impacter les interfaces existantes.
+**APIs exposées** :
+- `POST /api/v1/orders/checkout` : Processus commande
+- `GET /api/v1/orders/{id}` : Détail commande
+- `PUT /api/v1/orders/{id}/status` : Mise à jour statut
+- `GET /api/v1/customers/{id}/orders` : Historique commandes
 
-## Contraintes
+### 5. Inventory Service - Stocks Multi-Locations
 
-### Techniques ✅
-- Architecture 3-tier avec couche de services centralisés
-- Interface web MVC simplifiée avec Flask (UC3 + UC8 uniquement)
-- Interface console étendue pour fonctionnalités opérationnelles
-- API REST Flask-RESTX avec architecture DDD et documentation Swagger automatique
-- Utilisation d'un ORM (SQLAlchemy) pour l'abstraction de persistance
-- Synchronisation des données entre entités distribuées
+**Responsabilité** : Gestion stocks magasins physiques + e-commerce
 
-### Organisationnelles ✅
-- Continuité avec le système Lab 1 existant (réutilisation des services)
-- Interface console enrichie selon le type d'entité (magasin/maison mère/centre logistique)
-- Interface web légère pour supervision à distance uniquement
-- API REST pour intégrations externes avec architecture métier structurée
-- Séparation claire des responsabilités entre console (opérations), web (supervision) et API (intégrations)
+**Besoins métier** :
+- **Stock multi-locations** : Magasins + entrepôt e-commerce
+- **Réservations stock** : Allocation temporaire (panier → commande)
+- **Transferts inter-magasins** : Optimisation distribution
+- **Alertes stock bas** : Notifications automatiques réapprovisionnement
+- **Inventaire temps réel** : Synchronisation cross-canal
 
-### Environnement ✅
-- Déploiement via Docker et Docker Compose
-- Support de 5 magasins + centre logistique + maison mère
-- Interface web accessible via navigateur standard
-- Interface console adaptée à chaque type d'entité
-- API REST accessible via HTTP sur port 8000 avec documentation interactive
+**Cas d'usage** :
+- Consultation stock disponible par localisation
+- Réservation stock lors ajout panier e-commerce
+- Validation disponibilité avant vente POS
+- Alertes automatiques seuils stock minimum
+
+**APIs exposées** :
+- `GET /api/v1/inventory/stock/{product_id}` : Stock par produit
+- `POST /api/v1/inventory/reserve` : Réservation stock
+- `PUT /api/v1/inventory/transfer` : Transfert inter-magasins
+- `GET /api/v1/inventory/alerts` : Alertes stock bas
+
+### 6. Sales Service - Ventes POS Magasins
+
+**Responsabilité** : Transactions POS magasins physiques
+
+**Besoins métier** :
+- **Transactions POS** : Encaissement magasins physiques
+- **Moyens paiement** : Cash, cartes, chèques, contactless
+- **Gestion retours** : Retours produits avec remboursement
+- **Receipts digitaux** : Tickets dématérialisés optional
+- **Integration legacy** : Compatibilité systèmes POS existants
+
+**Cas d'usage** :
+- Vente produit en magasin avec encaissement
+- Retour produit avec remboursement
+- Consultation historique ventes par caissier
+- Intégration TPE et systèmes paiement
+
+**APIs exposées** :
+- `POST /api/v1/sales/transactions` : Enregistrement vente POS
+- `POST /api/v1/sales/returns` : Traitement retour
+- `GET /api/v1/sales/history` : Historique ventes
+- `GET /api/v1/sales/receipts/{id}` : Génération reçu
+
+### 7. Reporting Service - Analytics Consolidé
+
+**Responsabilité** : Business intelligence cross-canal
+
+**Besoins métier** :
+- **Rapports consolidés** : Ventes POS + E-commerce unifiées
+- **KPIs temps réel** : Chiffre d'affaires, conversion, panier moyen
+- **Analytics produits** : Ventes par catégorie, tendances, top sellers
+- **Performance magasins** : Comparatifs, objectifs, alertes
+- **Dashboards métier** : Visualisations Grafana interactives
+
+**Cas d'usage** :
+- Dashboard CEO : Chiffres clés en temps réel
+- Rapports managers : Performance par magasin/canal
+- Analytics produits : Optimisation catalogue
+- Alertes business : Baisse conversion, stock rupture
+
+**APIs exposées** :
+- `GET /api/v1/reports/dashboard` : KPIs temps réel
+- `GET /api/v1/reports/sales/consolidated` : Rapports ventes
+- `GET /api/v1/reports/products/analytics` : Analytics produits
+- `POST /api/v1/reports/generate` : Génération rapports custom
+
+## Besoins non-fonctionnels microservices
+
+### Performance et scalabilité
+
+**Targets de performance** :
+- **API latency** : < 200ms p95 pour appels simple service
+- **E-commerce checkout** : < 2s end-to-end process complet
+- **Dashboard load** : < 1s agrégation multi-services
+- **Throughput** : Support 1000+ utilisateurs concurrent
+- **Availability** : 99.9% uptime avec health checks automatiques
+
+**Scalabilité horizontale** :
+- **Service scaling** : Scale individuel services based on load
+- **Database scaling** : Read replicas per service si nécessaire
+- **Load balancing** : Kong upstream management avec failover
+- **Cache distribution** : Redis cluster pour Cart Service
+
+### Sécurité et authentification
+
+**Authentification multi-niveaux** :
+- **Kong Gateway** : Point d'entrée sécurisé unique
+- **API Keys** : Applications externes et tests automatisés
+- **JWT tokens** : Authentification clients e-commerce
+- **mTLS** : Communication inter-services sécurisée
+
+**Protection données** :
+- **PCI compliance** : Données paiement chiffrées
+- **GDPR compliance** : Privacy données clients
+- **Database encryption** : At-rest et in-transit
+- **Audit logging** : Traçabilité complète accès
+
+### Observabilité et monitoring
+
+**Three pillars of observability** :
+- **Metrics** : Prometheus + Grafana (business + technical)
+- **Logging** : Structured logging avec correlation IDs
+- **Tracing** : Distributed tracing cross-services
+
+**Alerting proactive** :
+- **Service health** : Alertes immédiates service down
+- **Performance degradation** : Seuils response time
+- **Business metrics** : Baisse conversion, abandon panier
+- **Infrastructure** : Utilisation ressources limites
+
+### Résilience et fault tolerance
+
+**High availability patterns** :
+- **Circuit breaker** : Protection cascade failures
+- **Retry logic** : Automatic retry avec exponential backoff
+- **Graceful degradation** : Fallback strategies per service
+- **Health checks** : Monitoring Kong + Prometheus
+
+**Recovery strategies** :
+- **Database backups** : Automated per service
+- **Disaster recovery** : Cross-region replication ready
+- **Service redundancy** : Multiple instances critical services
+- **Data consistency** : Event-driven synchronization
+
+## Architecture microservices
+
+### Communication patterns
+
+**Synchrone (Kong Gateway)** :
+- External clients → Kong Gateway (HTTPS API Key/JWT)
+- Kong → Microservices (HTTP load-balanced)
+- Service-to-service direct (HTTP REST optimisé)
+
+**Asynchrone (Future evolution)** :
+- Event-driven architecture pour data consistency
+- Message queues pour workflow long-running
+- CQRS patterns pour read/write optimization
+
+### Data management
+
+**Database per Service** :
+- **Isolation complète** : Aucun accès direct cross-database
+- **Technology diversity** : PostgreSQL + Redis selon besoins
+- **Independent scaling** : Per service optimization
+- **Schema evolution** : Autonome per bounded context
+
+**Data consistency** :
+- **ACID transactions** : Per service boundary
+- **Eventual consistency** : Cross-service via events
+- **Saga patterns** : Distributed transactions long-running
+
+### Service boundaries
+
+**Bounded contexts DDD** :
+- **Product Catalog** : Product Service
+- **Customer Management** : Customer Service  
+- **Shopping Experience** : Cart Service (load-balanced)
+- **Order Management** : Order Service
+- **Inventory Management** : Inventory Service
+- **Point of Sale** : Sales Service
+- **Business Intelligence** : Reporting Service
+
+## Contraintes et dépendances
+
+### Contraintes techniques
+
+**Infrastructure requirements** :
+- **Docker environment** : Container orchestration
+- **Minimum 16GB RAM** : 7 services + 7 databases + monitoring
+- **Network latency** : < 10ms inter-service optimal
+- **Storage capacity** : 100GB+ pour databases + logs
+
+**Technology constraints** :
+- **Python ecosystem** : Maintenir stack existante
+- **PostgreSQL standard** : Database per service consistency
+- **Kong Gateway** : API management centralisé
+- **Prometheus/Grafana** : Monitoring stack standard
+
+### Dépendances externes
+
+**Payment gateways** :
+- Integration Stripe/PayPal pour e-commerce
+- TPE hardware pour POS magasins
+- PCI DSS compliance requirements
+
+**Third-party services** :
+- Email service pour notifications clients
+- SMS gateway pour tracking commandes
+- CDN pour assets statiques e-commerce
+
+## Plan de migration
+
+### Phase 1 : Infrastructure microservices
+- [✓] Déploiement Kong Gateway
+- [✓] Setup databases per service
+- [✓] Configuration monitoring stack
+- [✓] Network microservices isolation
+
+### Phase 2 : Services core
+- [✓] Product Service (catalogue unifié)
+- [✓] Inventory Service (stocks multi-locations)
+- [✓] Sales Service (POS legacy compatible)
+
+### Phase 3 : E-commerce services
+- [✓] Customer Service (authentification JWT)
+- [✓] Cart Service (load-balanced Redis)
+- [✓] Order Service (checkout workflow)
+
+### Phase 4 : Analytics et optimisations
+- [✓] Reporting Service (BI consolidé)
+- [✓] Load testing et performance tuning
+- [✓] Documentation et formation équipes
+
+## Conclusion
+
+L'architecture microservices Lab 5 répond aux besoins d'un **écosystème commercial moderne hybride** POS + E-commerce, avec une **scalabilité cloud-native** et une **observabilité production-ready**. Kong Gateway assure la gouvernance API centralisée tout en permettant l'autonomie et l'évolution indépendante des services métier.

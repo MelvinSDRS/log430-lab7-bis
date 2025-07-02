@@ -1,0 +1,508 @@
+services:
+  # Base de données PostgreSQL pour Product Service
+  product-db:
+    image: postgres:15
+    container_name: pos-product-db
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_USER: product_user
+      POSTGRES_PASSWORD: product_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - product_data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product_user -d product_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Base de données PostgreSQL pour Customer Service
+  customer-db:
+    image: postgres:15
+    container_name: pos-customer-db
+    environment:
+      POSTGRES_DB: customer_db
+      POSTGRES_USER: customer_user
+      POSTGRES_PASSWORD: customer_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - customer_data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Base de données PostgreSQL pour Inventory Service
+  inventory-db:
+    image: postgres:15
+    container_name: pos-inventory-db
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_USER: inventory_user
+      POSTGRES_PASSWORD: inventory_password
+    ports:
+      - "5435:5432"
+    volumes:
+      - inventory_data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory_user -d inventory_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Base de données PostgreSQL pour Sales Service
+  sales-db:
+    image: postgres:15
+    container_name: pos-sales-db
+    environment:
+      POSTGRES_DB: sales_db
+      POSTGRES_USER: sales_user
+      POSTGRES_PASSWORD: sales_password
+    ports:
+      - "5436:5432"
+    volumes:
+      - sales_data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sales_user -d sales_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Base de données PostgreSQL pour Reporting Service
+  reporting-db:
+    image: postgres:15
+    container_name: pos-reporting-db
+    environment:
+      POSTGRES_DB: reporting_db
+      POSTGRES_USER: reporting_user
+      POSTGRES_PASSWORD: reporting_password
+    ports:
+      - "5437:5432"
+    volumes:
+      - reporting_data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reporting_user -d reporting_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Base de données PostgreSQL pour Order Service
+  order-db:
+    image: postgres:15
+    container_name: pos-order-db
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: order_user
+      POSTGRES_PASSWORD: order_password
+    ports:
+      - "5438:5432"
+    volumes:
+      - order_data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U order_user -d order_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis pour Cart Service
+  cart-cache:
+    image: redis:7-alpine
+    container_name: pos-cart-cache
+    environment:
+      - REDIS_PASSWORD=cart-cache-secret-2025
+    volumes:
+      - cart_data:/data
+    command: |
+      redis-server 
+      --requirepass cart-cache-secret-2025
+      --appendonly yes 
+      --maxmemory 512mb 
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 300
+      --timeout 0
+    ports:
+      - "6380:6379"
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "cart-cache-secret-2025", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Microservice Product Service
+  product-service:
+    build:
+      context: ./product-service
+      dockerfile: Dockerfile
+    container_name: pos-product-service
+    environment:
+      - PRODUCT_DB_URL=postgresql://product_user:product_password@product-db:5432/product_db
+      - SECRET_KEY=product-service-secret-2025
+      - DEBUG=False
+    ports:
+      - "8001:8001"
+    depends_on:
+      product-db:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Microservice Inventory Service
+  inventory-service:
+    build:
+      context: ./inventory-service
+      dockerfile: Dockerfile
+    container_name: pos-inventory-service
+    environment:
+      - INVENTORY_DB_URL=postgresql://inventory_user:inventory_password@inventory-db:5432/inventory_db
+      - SECRET_KEY=inventory-service-secret-2025
+      - DEBUG=False
+    ports:
+      - "8002:8002"
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Microservice Sales Service
+  sales-service:
+    build:
+      context: ./sales-service
+      dockerfile: Dockerfile
+    container_name: pos-sales-service
+    environment:
+      - SALES_DB_URL=postgresql://sales_user:sales_password@sales-db:5432/sales_db
+      - SECRET_KEY=sales-service-secret-2025
+      - DEBUG=False
+      # URLs des autres services pour intégration
+      - INVENTORY_SERVICE_URL=http://inventory-service:8002
+      - PRODUCT_SERVICE_URL=http://product-service:8001
+    ports:
+      - "8003:8003"
+    depends_on:
+      sales-db:
+        condition: service_healthy
+      inventory-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Microservice Reporting Service
+  reporting-service:
+    build:
+      context: ./reporting-service
+      dockerfile: Dockerfile
+    container_name: pos-reporting-service
+    environment:
+      - REPORTING_DB_URL=postgresql://reporting_user:reporting_password@reporting-db:5432/reporting_db
+      - SECRET_KEY=reporting-service-secret-2025
+      - DEBUG=False
+      # URLs des autres services pour agrégation de données
+      - SALES_SERVICE_URL=http://sales-service:8003
+      - INVENTORY_SERVICE_URL=http://inventory-service:8002
+      - PRODUCT_SERVICE_URL=http://product-service:8001
+    ports:
+      - "8004:8004"
+    depends_on:
+      reporting-db:
+        condition: service_healthy
+      sales-service:
+        condition: service_started
+      inventory-service:
+        condition: service_started
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Microservice Customer Service
+  customer-service:
+    build:
+      context: ./customer-service
+      dockerfile: Dockerfile
+    container_name: pos-customer-service
+    environment:
+      - DATABASE_URL=postgresql://customer_user:customer_password@customer-db:5432/customer_db
+      - REDIS_URL=redis://cart-cache:6379/1
+      - JWT_SECRET=jwt-customer-secret-2025
+      - JWT_ALGORITHM=HS256
+      - FLASK_ENV=development
+    ports:
+      - "8005:8005"
+    depends_on:
+      customer-db:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Cart Service - Instance 1 (Load Balancing Étape 3)
+  cart-service-1:
+    build: ./cart-service
+    container_name: pos-cart-service-1
+    environment:
+      - REDIS_URL=redis://cart-cache:6379/0
+      - FLASK_ENV=development
+      - INSTANCE_ID=cart-1
+      - SERVICE_NAME=cart-service-1
+    expose:
+      - "8006"
+    depends_on:
+      cart-cache:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # Cart Service - Instance 2 (Load Balancing Étape 3)
+  cart-service-2:
+    build: ./cart-service
+    container_name: pos-cart-service-2
+    environment:
+      - REDIS_URL=redis://cart-cache:6379/0
+      - FLASK_ENV=development
+      - INSTANCE_ID=cart-2
+      - SERVICE_NAME=cart-service-2
+    expose:
+      - "8006"
+    depends_on:
+      cart-cache:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # Cart Service - Instance 3 (Load Balancing Étape 3)
+  cart-service-3:
+    build: ./cart-service
+    container_name: pos-cart-service-3
+    environment:
+      - REDIS_URL=redis://cart-cache:6379/0
+      - FLASK_ENV=development
+      - INSTANCE_ID=cart-3
+      - SERVICE_NAME=cart-service-3
+    expose:
+      - "8006"
+    depends_on:
+      cart-cache:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # Cart Service - Legacy (sera supprimé après Étape 3)
+  cart-service:
+    build: ./cart-service
+    container_name: pos-cart-service-legacy
+    environment:
+      - REDIS_URL=redis://cart-cache:6379/0
+      - FLASK_ENV=development
+      - INSTANCE_ID=cart-legacy
+      - SERVICE_NAME=cart-service-legacy
+    ports:
+      - "8006:8006"
+    depends_on:
+      cart-cache:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - legacy
+
+  # Microservice Order Service
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: pos-order-service
+    environment:
+      - ORDER_DB_URL=postgresql://order_user:order_password@order-db:5432/order_db
+      - SECRET_KEY=order-service-secret-2025
+      - DEBUG=False
+      # URLs des autres services pour checkout (via Kong Gateway)
+      - CART_SERVICE_URL=http://api-gateway:8000/api/v1/cart
+      - INVENTORY_SERVICE_URL=http://inventory-service:8002
+      - CUSTOMER_SERVICE_URL=http://customer-service:8005
+      - PRODUCT_SERVICE_URL=http://product-service:8001
+    ports:
+      - "8007:8007"
+    depends_on:
+      order-db:
+        condition: service_healthy
+      cart-service-1:
+        condition: service_started
+      inventory-service:
+        condition: service_started
+      customer-service:
+        condition: service_started
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway (Kong Community)
+  api-gateway:
+    image: kong:latest
+    container_name: pos-api-gateway
+    environment:
+      - KONG_DATABASE=off
+      - KONG_DECLARATIVE_CONFIG=/kong/declarative/kong.yml
+      - KONG_PROXY_ACCESS_LOG=/dev/stdout
+      - KONG_ADMIN_ACCESS_LOG=/dev/stdout
+      - KONG_PROXY_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_LISTEN=0.0.0.0:8001
+      - KONG_LOG_LEVEL=info
+      - KONG_PLUGINS=bundled,prometheus,cors,rate-limiting,key-auth,jwt,request-transformer,response-transformer,correlation-id,file-log,proxy-cache
+    volumes:
+      - ./api-gateway/kong.yml:/kong/declarative/kong.yml:ro
+      - kong_logs:/var/log/kong
+    ports:
+      - "8080:8000"  # Proxy (point d'entrée principal)
+      - "8443:8443"  # Proxy SSL
+      - "8011:8001"  # Admin API
+      - "8444:8444"  # Admin API SSL
+    depends_on:
+      - product-service
+      - inventory-service
+      - sales-service
+      - reporting-service
+      - customer-service
+      - cart-service-1
+      - cart-service-2
+      - cart-service-3
+      - order-service
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service discovery et monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pos-prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - microservices-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pos-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - microservices-network
+    restart: unless-stopped
+
+volumes:
+  product_data:
+  customer_data:
+  inventory_data:
+  sales_data:
+  reporting_data:
+  order_data:
+  cart_data:
+  grafana_data:
+  prometheus_data:
+  kong_logs:
+
+networks:
+  microservices-network:
+    driver: bridge
+    name: pos-microservices-network 

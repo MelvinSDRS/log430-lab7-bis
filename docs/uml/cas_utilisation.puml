@@ -1,75 +1,188 @@
 @startuml
 left to right direction
 
-actor "Employé Magasin" as EM
-actor "Responsable Logistique" as RL
-actor "Gestionnaire Maison Mère" as GM
-actor "Application Externe" as AE
+' Acteurs principaux
+actor "Client E-commerce" as CLIENT
+actor "Employé Magasin" as EMPLOYEE
+actor "Gestionnaire" as MANAGER
+actor "Application Mobile" as MOBILE
+actor "Système Externe" as EXTERNAL
 
-rectangle "Système POS Multi-Magasins" {
+rectangle "Système POS Microservices - Lab 5" {
   
-  rectangle "Interface Console (Opérationnel)" as CONSOLE {
-    ' UC hérités du Lab 1
-    (Rechercher un produit) as UC_RECHERCHE
-    (Enregistrer une vente) as UC_VENTE
-    (Gérer les retours) as UC_RETOUR
-    
-    ' UC Lab 2 - Console
-    (UC1: Générer rapports) as UC1_CONSOLE
-    (UC2: Consulter stock central) as UC2
-    (UC4: Gérer produits) as UC4_CONSOLE
-    (UC6: Traiter approvisionnement) as UC6
+  ' Product Service Use Cases
+  rectangle "Product Service" as PRODUCT_BC {
+    (Consulter catalogue) as UC_CATALOG
+    (Rechercher produits) as UC_SEARCH
+    (Gérer produits) as UC_MANAGE_PRODUCTS
+    (Gérer catégories) as UC_MANAGE_CATEGORIES
   }
   
-  rectangle "Interface Web (Supervision)" as WEB {
-    (UC3: Tableau de bord) as UC3_WEB
-    (UC8: Supervision légère) as UC8
+  ' Customer Service Use Cases  
+  rectangle "Customer Service" as CUSTOMER_BC {
+    (Créer compte client) as UC_REGISTER
+    (Authentifier client) as UC_LOGIN
+    (Gérer profil) as UC_PROFILE
+    (Gérer adresses) as UC_ADDRESSES
   }
   
-  rectangle "Interface API REST (Intégrations)" as API {
-    (UC1: Rapports consolidés) as UC1_API
-    (UC2: Consultation stocks) as UC2_API
-    (UC3: Performances magasins) as UC3_API
-    (UC4: Gestion produits) as UC4_API
+  ' Cart Service Use Cases
+  rectangle "Cart Service (Load Balanced)" as CART_BC {
+    (Ajouter au panier) as UC_ADD_CART
+    (Modifier panier) as UC_UPDATE_CART
+    (Vider panier) as UC_CLEAR_CART
+    (Calculer taxes) as UC_CALC_TAXES
   }
   
-  ' Relations Console
-  EM -- UC_RECHERCHE
-  EM -- UC_VENTE
-  EM -- UC_RETOUR
-  EM -- UC2
+  ' Order Service Use Cases
+  rectangle "Order Service" as ORDER_BC {
+    (Finaliser commande) as UC_CHECKOUT
+    (Suivre commande) as UC_TRACK_ORDER
+    (Gérer commandes) as UC_MANAGE_ORDERS
+    (Traiter paiement) as UC_PAYMENT
+  }
   
-  RL -- UC6
+  ' Inventory Service Use Cases
+  rectangle "Inventory Service" as INVENTORY_BC {
+    (Consulter stocks) as UC_CHECK_STOCK
+    (Réserver stock) as UC_RESERVE_STOCK
+    (Gérer approvisionnement) as UC_REPLENISH
+    (Alertes stock) as UC_STOCK_ALERTS
+  }
   
-  GM -- UC1_CONSOLE
-  GM -- UC4_CONSOLE
+  ' Sales Service Use Cases (POS)
+  rectangle "Sales Service" as SALES_BC {
+    (Traitement vente POS) as UC_POS_SALE
+    (Gestion retours) as UC_RETURNS
+    (Transactions magasin) as UC_STORE_TRANS
+    (Encaissement) as UC_CASHIER
+  }
   
-  ' Relations Web
-  GM -- UC3_WEB
-  GM -- UC8
-  
-  ' Relations API REST
-  AE -- UC1_API
-  AE -- UC2_API
-  AE -- UC3_API
-  AE -- UC4_API
+  ' Reporting Service Use Cases
+  rectangle "Reporting Service" as REPORTING_BC {
+    (Rapports consolidés) as UC_REPORTS
+    (Tableau de bord) as UC_DASHBOARD
+    (Analytics ventes) as UC_ANALYTICS
+    (Métriques performance) as UC_METRICS
+  }
 }
 
-note right of CONSOLE
-  Fonctionnalités opérationnelles
-  Adaptées selon type d'entité
+' Kong API Gateway
+rectangle "Kong API Gateway" as GATEWAY {
+  (Authentification API) as UC_API_AUTH
+  (Rate Limiting) as UC_RATE_LIMIT
+  (Load Balancing) as UC_LOAD_BALANCE
+  (Routage services) as UC_ROUTING
+  }
+  
+' Relations Client E-commerce
+CLIENT --> UC_CATALOG
+CLIENT --> UC_SEARCH
+CLIENT --> UC_REGISTER
+CLIENT --> UC_LOGIN
+CLIENT --> UC_PROFILE
+CLIENT --> UC_ADD_CART
+CLIENT --> UC_UPDATE_CART
+CLIENT --> UC_CHECKOUT
+CLIENT --> UC_TRACK_ORDER
+
+' Relations Employé Magasin
+EMPLOYEE --> UC_POS_SALE
+EMPLOYEE --> UC_RETURNS
+EMPLOYEE --> UC_CASHIER
+EMPLOYEE --> UC_CHECK_STOCK
+EMPLOYEE --> UC_SEARCH
+
+' Relations Gestionnaire
+MANAGER --> UC_MANAGE_PRODUCTS
+MANAGER --> UC_MANAGE_CATEGORIES
+MANAGER --> UC_REPORTS
+MANAGER --> UC_DASHBOARD
+MANAGER --> UC_ANALYTICS
+MANAGER --> UC_REPLENISH
+MANAGER --> UC_MANAGE_ORDERS
+
+' Relations Application Mobile
+MOBILE --> UC_CATALOG
+MOBILE --> UC_SEARCH
+MOBILE --> UC_ADD_CART
+MOBILE --> UC_CHECKOUT
+MOBILE --> UC_TRACK_ORDER
+MOBILE --> UC_LOGIN
+
+' Relations Système Externe
+EXTERNAL --> UC_MANAGE_PRODUCTS
+EXTERNAL --> UC_REPORTS
+EXTERNAL --> UC_CHECK_STOCK
+EXTERNAL --> UC_ANALYTICS
+
+' Toutes les interactions passent par Kong Gateway
+CLIENT --> GATEWAY
+EMPLOYEE --> GATEWAY
+MANAGER --> GATEWAY
+MOBILE --> GATEWAY
+EXTERNAL --> GATEWAY
+
+' Gateway route vers les services
+GATEWAY --> PRODUCT_BC
+GATEWAY --> CUSTOMER_BC
+GATEWAY --> CART_BC
+GATEWAY --> ORDER_BC
+GATEWAY --> INVENTORY_BC
+GATEWAY --> SALES_BC
+GATEWAY --> REPORTING_BC
+
+' Relations internes entre services (via Kong)
+UC_CHECKOUT ..> UC_ADD_CART : "validate cart"
+UC_CHECKOUT ..> UC_RESERVE_STOCK : "stock validation"
+UC_CHECKOUT ..> UC_LOGIN : "customer auth"
+UC_POS_SALE ..> UC_CHECK_STOCK : "stock validation"
+UC_POS_SALE ..> UC_CATALOG : "product lookup"
+UC_REPORTS ..> UC_STORE_TRANS : "sales data"
+UC_REPORTS ..> UC_CHECK_STOCK : "inventory data"
+
+note top of GATEWAY
+  Kong API Gateway :8080
+  - Point d'entrée unique
+  - API Key & JWT Authentication
+  - Rate Limiting (100/min)
+  - CORS & Security
+  - Load Balancing (Cart Service)
+  - Health Checks & Monitoring
 end note
 
-note right of WEB
-  Supervision à distance
-  Interface légère
+note right of CART_BC
+  Load Balanced Service:
+  - 3 instances actives
+  - Redis shared state
+  - Session persistence
+  - Automatic failover
 end note
 
-note right of API
-  Architecture DDD
-  Documentation Swagger
-  Authentification Bearer token
-  Standards RESTful + HATEOAS
+note right of PRODUCT_BC
+  Microservices Architecture:
+  - Database per Service
+  - Domain boundaries respect
+  - Event-driven communication
+  - Service autonomy
+  - API-first design
+end note
+
+note bottom of CLIENT
+  Use Cases E-commerce:
+  - Navigation produits
+  - Gestion panier
+  - Checkout sécurisé
+  - Suivi commandes
+  - Compte client
+end note
+
+note bottom of EMPLOYEE
+  Use Cases POS:
+  - Ventes traditionnelles
+  - Encaissement physique
+  - Gestion retours
+  - Consultation stocks
 end note
 
 @enduml

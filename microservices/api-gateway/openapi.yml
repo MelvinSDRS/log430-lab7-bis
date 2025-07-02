@@ -1,0 +1,1033 @@
+openapi: 3.0.3
+info:
+  title: POS Multi-Magasins - API Gateway
+  description: |
+    API Gateway pour le système POS Multi-Magasins avec architecture microservices.
+    
+    ## Authentification
+    
+    ### API Keys (Kong Gateway)
+    - **Header**: `X-API-KEY`
+    - **Valeur**: `pos-microservices-2025`
+    
+    ### JWT Authentication (Services clients)
+    - **Header**: `Authorization`
+    - **Format**: `Bearer <jwt_token>`
+    - **Endpoint de login**: `POST /api/v1/customers/auth/login`
+    
+    ## Architecture Microservices
+    
+    Le système est composé de 7 microservices :
+    
+    ### Services Métier (extraits du monolithe)
+    1. **Product Service** (Port 8001) - Catalogue produits
+    2. **Inventory Service** (Port 8002) - Gestion des stocks  
+    3. **Sales Service** (Port 8003) - Transactions POS
+    4. **Reporting Service** (Port 8004) - Rapports analytiques
+    
+    ### Services E-commerce (nouveaux)
+    5. **Customer Service** (Port 8005) - Comptes clients
+    6. **Cart Service** (Port 8006) - Panier d'achats
+    7. **Order Service** (Port 8007) - Gestion des commandes
+    
+    ## Load Balancing
+    
+    Le Cart Service utilise un load balancer avec 3 instances (algorithme least-connections).
+    
+    ## Monitoring
+    
+    - **Prometheus**: Métriques sur `/metrics`
+    - **Grafana**: Dashboard Kong Gateway
+    - **Health checks**: `/health` sur chaque service
+    
+  version: "1.0.0"
+  contact:
+    name: LOG430 Lab 5 Team
+    email: lab430@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Kong API Gateway (développement)
+  - url: http://localhost:8000
+    description: API Monolithique (référence)
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+      description: Clé API pour accéder aux microservices via Kong Gateway
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT pour l'authentification des clients
+
+  schemas:
+    # Modèles Product Service
+    Product:
+      type: object
+      required: [nom, prix, stock, id_categorie]
+      properties:
+        id:
+          type: integer
+          description: ID unique du produit
+        nom:
+          type: string
+          description: Nom du produit
+        prix:
+          type: number
+          format: float
+          description: Prix unitaire
+        stock:
+          type: integer
+          description: Quantité en stock
+        id_categorie:
+          type: integer
+          description: ID de la catégorie
+        seuil_alerte:
+          type: integer
+          description: Seuil d'alerte stock
+        description:
+          type: string
+          description: Description du produit
+    
+    # Modèles Customer Service  
+    Customer:
+      type: object
+      required: [email, nom, prenom]
+      properties:
+        id:
+          type: integer
+          description: ID unique du client
+        email:
+          type: string
+          format: email
+          description: Email du client
+        nom:
+          type: string
+          description: Nom du client
+        prenom:
+          type: string
+          description: Prénom du client
+        telephone:
+          type: string
+          description: Numéro de téléphone
+        date_naissance:
+          type: string
+          format: date
+          description: Date de naissance
+        actif:
+          type: boolean
+          description: Compte actif
+    
+    # Modèles Cart Service
+    CartItem:
+      type: object
+      required: [product_id, quantity]
+      properties:
+        product_id:
+          type: integer
+          description: ID du produit
+        quantity:
+          type: integer
+          minimum: 1
+          description: Quantité
+        price:
+          type: number
+          format: float
+          description: Prix unitaire
+        name:
+          type: string
+          description: Nom du produit
+    
+    Cart:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        total:
+          type: number
+          format: float
+          description: Total du panier
+        customer_id:
+          type: integer
+          description: ID du client propriétaire
+    
+    # Modèles Order Service
+    Order:
+      type: object
+      required: [customer_id, items]
+      properties:
+        id:
+          type: integer
+          description: ID de la commande
+        customer_id:
+          type: integer
+          description: ID du client
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        status:
+          type: string
+          enum: [pending, confirmed, shipped, delivered, cancelled]
+          description: Statut de la commande
+        total:
+          type: number
+          format: float
+          description: Total de la commande
+        created_at:
+          type: string
+          format: date-time
+          description: Date de création
+        
+    OrderItem:
+      type: object
+      required: [product_id, quantity, unit_price]
+      properties:
+        product_id:
+          type: integer
+          description: ID du produit
+        quantity:
+          type: integer
+          minimum: 1
+          description: Quantité commandée
+        unit_price:
+          type: number
+          format: float
+          description: Prix unitaire
+        total_price:
+          type: number
+          format: float
+          description: Prix total de la ligne
+    
+    # Modèles communs
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        service:
+          type: string
+          description: Nom du service
+        timestamp:
+          type: string
+          format: date-time
+        details:
+          type: object
+          description: Détails additionnels
+    
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Message d'erreur
+        code:
+          type: integer
+          description: Code d'erreur HTTP
+        details:
+          type: string
+          description: Détails supplémentaires
+
+paths:
+  # Health Checks Gateway
+  /health:
+    get:
+      tags: [Gateway]
+      summary: Health check du Gateway Kong
+      description: Vérifier l'état de santé de l'API Gateway
+      responses:
+        '200':
+          description: Gateway opérationnel
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  # Product Service Routes
+  /api/v1/products:
+    get:
+      tags: [Products]
+      summary: Lister les produits
+      description: Récupérer la liste des produits avec pagination
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Recherche par nom
+      responses:
+        '200':
+          description: Liste des produits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  meta:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                      per_page:
+                        type: integer
+                      total:
+                        type: integer
+    
+    post:
+      tags: [Products]
+      summary: Créer un produit
+      description: Ajouter un nouveau produit au catalogue
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Product'
+      responses:
+        '201':
+          description: Produit créé avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+
+  /api/v1/products/{product_id}:
+    get:
+      tags: [Products]
+      summary: Récupérer un produit
+      description: Obtenir les détails d'un produit spécifique
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Détails du produit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Produit non trouvé
+
+  # Customer Service Routes
+  /api/v1/customers/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Créer un compte client
+      description: Enregistrer un nouveau client dans le système
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, nom, prenom]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                nom:
+                  type: string
+                prenom:
+                  type: string
+                telephone:
+                  type: string
+                date_naissance:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: Compte créé avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  customer:
+                    $ref: '#/components/schemas/Customer'
+
+  /api/v1/customers/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authentifier un client
+      description: Connecter un client et obtenir un token JWT
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Authentification réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Token JWT pour les requêtes authentifiées
+                  customer:
+                    $ref: '#/components/schemas/Customer'
+        '401':
+          description: Identifiants invalides
+
+  # Cart Service Routes (Load Balanced)
+  /api/v1/cart:
+    get:
+      tags: [Cart]
+      summary: Récupérer le panier
+      description: Obtenir le contenu du panier (load balancé sur 3 instances)
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: ID de session du panier
+      responses:
+        '200':
+          description: Contenu du panier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+    
+    post:
+      tags: [Cart]
+      summary: Ajouter un produit au panier
+      description: Ajouter ou mettre à jour un produit dans le panier
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, quantity]
+              properties:
+                product_id:
+                  type: integer
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Produit ajouté au panier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+
+    put:
+      tags: [Cart]
+      summary: Mettre à jour la quantité
+      description: Modifier la quantité d'un produit dans le panier
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, quantity]
+              properties:
+                product_id:
+                  type: integer
+                quantity:
+                  type: integer
+                  minimum: 0
+      responses:
+        '200':
+          description: Quantité mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+
+  /api/v1/cart/health:
+    get:
+      tags: [Cart]
+      summary: Health check Cart Service
+      description: Vérifier l'état et l'instance du Cart Service (load balancing)
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: session_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Instance Cart Service opérationnelle
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/HealthStatus'
+                  - type: object
+                    properties:
+                      instance_id:
+                        type: string
+                        description: ID de l'instance Cart Service
+
+  # Order Service Routes
+  /api/v1/orders:
+    get:
+      tags: [Orders]
+      summary: Lister les commandes
+      description: Récupérer les commandes d'un client
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: customer_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Liste des commandes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+    
+    post:
+      tags: [Orders]
+      summary: Créer une commande
+      description: Créer une nouvelle commande à partir du panier
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customer_id, items]
+              properties:
+                customer_id:
+                  type: integer
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [product_id, quantity, unit_price]
+                    properties:
+                      product_id:
+                        type: integer
+                      quantity:
+                        type: integer
+                        minimum: 1
+                      unit_price:
+                        type: number
+                        format: float
+      responses:
+        '201':
+          description: Commande créée avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /api/v1/orders/{order_id}:
+    get:
+      tags: [Orders]
+      summary: Détails d'une commande
+      description: Récupérer les détails d'une commande spécifique
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Détails de la commande
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          description: Commande non trouvée
+
+  # Inventory Service Routes
+  /api/v1/inventory:
+    get:
+      tags: [Inventory]
+      summary: Consulter les stocks
+      description: Récupérer les niveaux de stock par magasin
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: store_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrer par magasin
+        - name: product_id
+          in: query
+          schema:
+            type: integer
+          description: Filtrer par produit
+      responses:
+        '200':
+          description: Niveaux de stock
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    product_id:
+                      type: integer
+                    store_id:
+                      type: integer
+                    quantity:
+                      type: integer
+                    reserved:
+                      type: integer
+                    available:
+                      type: integer
+
+  # Sales Service Routes
+  /api/v1/sales:
+    post:
+      tags: [Sales]
+      summary: Enregistrer une vente POS
+      description: Créer une transaction de vente en magasin
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [store_id, items, total]
+              properties:
+                store_id:
+                  type: integer
+                cashier_id:
+                  type: integer
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [product_id, quantity, unit_price]
+                    properties:
+                      product_id:
+                        type: integer
+                      quantity:
+                        type: integer
+                      unit_price:
+                        type: number
+                        format: float
+                total:
+                  type: number
+                  format: float
+      responses:
+        '201':
+          description: Vente enregistrée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sale_id:
+                    type: integer
+                  total:
+                    type: number
+                    format: float
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  # Reporting Service Routes
+  /api/v1/reports/sales/consolidated:
+    post:
+      tags: [Reports]
+      summary: Rapport consolidé des ventes
+      description: Générer un rapport consolidé pour tous les magasins
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Authentification réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Token JWT
+                  customer:
+                    $ref: '#/components/schemas/Customer'
+                  expires_in:
+                    type: integer
+                    description: Durée de validité en secondes
+
+  /api/v1/customers/{customer_id}:
+    get:
+      tags: [Customers]
+      summary: Récupérer un client
+      description: Obtenir les informations d'un client
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Informations du client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+
+  # Cart Service Routes (Load Balanced)
+  /api/v1/cart/{customer_id}:
+    get:
+      tags: [Cart]
+      summary: Récupérer le panier
+      description: Obtenir le contenu du panier d'un client (Load Balanced - 3 instances)
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Contenu du panier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+    
+    post:
+      tags: [Cart]
+      summary: Ajouter au panier
+      description: Ajouter un produit au panier (Load Balanced - 3 instances)
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartItem'
+      responses:
+        '200':
+          description: Produit ajouté au panier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+
+  # Order Service Routes
+  /api/v1/orders:
+    post:
+      tags: [Orders]
+      summary: Créer une commande
+      description: Créer une nouvelle commande à partir du panier
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Order'
+      responses:
+        '201':
+          description: Commande créée avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /api/v1/orders/{order_id}:
+    get:
+      tags: [Orders]
+      summary: Récupérer une commande
+      description: Obtenir les détails d'une commande
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Détails de la commande
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  # Inventory Service Routes
+  /api/v1/inventory/stores/{store_id}/products:
+    get:
+      tags: [Inventory]
+      summary: Stock par magasin
+      description: Récupérer les stocks d'un magasin spécifique
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: store_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Liste des stocks du magasin
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    product_id:
+                      type: integer
+                    product_name:
+                      type: string
+                    quantity:
+                      type: integer
+                    alert_threshold:
+                      type: integer
+
+  # Sales Service Routes
+  /api/v1/sales/transactions:
+    post:
+      tags: [Sales]
+      summary: Enregistrer une vente
+      description: Enregistrer une transaction de vente POS
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                store_id:
+                  type: integer
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      product_id:
+                        type: integer
+                      quantity:
+                        type: integer
+                      unit_price:
+                        type: number
+      responses:
+        '201':
+          description: Transaction enregistrée
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transaction_id:
+                    type: integer
+                  total:
+                    type: number
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  # Reporting Service Routes
+  /api/v1/reports/sales/consolidated:
+    get:
+      tags: [Reports]
+      summary: Rapport consolidé des ventes
+      description: Générer un rapport consolidé des ventes tous magasins
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Rapport de ventes consolidé
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    type: object
+                    properties:
+                      start_date:
+                        type: string
+                        format: date
+                      end_date:
+                        type: string
+                        format: date
+                  total_sales:
+                    type: number
+                  stores:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        store_id:
+                          type: integer
+                        store_name:
+                          type: string
+                        sales:
+                          type: number
+                        transactions:
+                          type: integer
+
+tags:
+  - name: Gateway
+    description: Opérations de l'API Gateway Kong
+  - name: Authentication
+    description: Authentification des clients e-commerce
+  - name: Products
+    description: Gestion du catalogue produits
+  - name: Customers
+    description: Gestion des comptes clients
+  - name: Cart
+    description: Gestion du panier d'achats (Load Balanced)
+  - name: Orders
+    description: Gestion des commandes e-commerce
+  - name: Inventory
+    description: Gestion des stocks par magasin
+  - name: Sales
+    description: Transactions de vente POS
+  - name: Reports
+    description: Rapports analytiques et métriques
+
+externalDocs:
+  description: Documentation complète LOG430 Lab 5
+  url: https://github.com/yourusername/log430-lab5/tree/main/microservices 

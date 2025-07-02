@@ -1,179 +1,474 @@
 @startuml
-' Entités métier principales
-class Produit {
-  +id: int
-  +nom: string
-  +prix: Decimal
-  +stock: int
-  +seuil_alerte: int
+' Microservices Architecture - Lab 5 Domain Model
+
+' Product Service Bounded Context
+package "Product Service" {
+  class Product {
+    +id: UUID
+    +name: string
+    +description: string
+    +price: Decimal
+    +category_id: UUID
+    +sku: string
+    +active: boolean
+    +created_at: datetime
+    +updated_at: datetime
+    +validate(): bool
+    +to_dict(): dict
 }
 
-class Vente {
-  +id: int
-  +horodatage: datetime
-  +id_entite: int
-  +total(): Decimal
+  class Category {
+    +id: UUID
+    +name: string
+    +description: string
+    +parent_id: UUID
+    +active: boolean
+    +get_subcategories(): Category[]
 }
 
-class LigneVente {
-  +qte: int
-  +sous_total(): Decimal
-}
-
-' Entités multi-magasins
-class Entite {
-  +id: int
-  +nom: string
-  +type_entite: TypeEntite
-}
-
-class TypeEntite <<enumeration>> {
-  MAGASIN
-  CENTRE_LOGISTIQUE
-  MAISON_MERE
-}
-
-class StockEntite {
-  +id: int
-  +id_produit: int
-  +id_entite: int
-  +quantite: int
-}
-
-class DemandeApprovisionnement {
-  +id: int
-  +id_entite_demandeur: int
-  +id_produit: int
-  +quantite_demandee: int
-  +statut: StatutDemande
-}
-
-class StatutDemande <<enumeration>> {
-  EN_ATTENTE
-  APPROUVEE
-  LIVREE
-}
-
-' Services essentiels
-class ServiceVente {
-  +creer_vente(): Vente
-}
-
-class ServiceApprovisionnement {
-  +creer_demande(): DemandeApprovisionnement
-  +valider_demande(): void
-}
-
-class ServiceTableauBord {
-  +calculer_indicateurs(): IndicateurPerformance
-}
-
-' Architecture DDD pour API
-package "API Bounded Contexts" {
-  
-  ' Shared Value Objects
-  class Money <<value object>> {
-    +amount: Decimal
-    +currency: string
-    +is_positive(): bool
-    +add(other: Money): Money
-  }
-  
-  class EntityId <<value object>> {
-    +value: int
-    +is_valid(): bool
-  }
-  
-  ' Product Catalog Bounded Context
-  package "Product Catalog" {
-    
-    ' Value Objects
-    class ProductId <<value object>> {
-      +value: int
-      +is_valid(): bool
-    }
-    
-    class ProductName <<value object>> {
-      +value: string
-      +is_valid(): bool
-    }
-    
-    class StockQuantity <<value object>> {
-      +value: int
-      +is_sufficient(needed: int): bool
-    }
-    
-    ' Aggregate Root
-    class Product <<aggregate root>> {
-      -id: ProductId
-      -name: ProductName
-      -price: Money
-      -stock: StockQuantity
-      +update_name(name: ProductName): void
-      +update_price(price: Money): void
-      +is_stock_below_threshold(): bool
-      +get_domain_events(): DomainEvent[]
-    }
-    
-    ' Domain Events
-    class ProductCreatedEvent <<domain event>> {
-      +product_id: ProductId
-      +occurred_at: datetime
-    }
-    
-    ' Domain Service
-    class ProductDomainService {
-      +ensure_name_uniqueness(): bool
-      +find_products_needing_replenishment(): Product[]
-    }
-    
-    ' Repository Interface
-    interface IProductRepository {
-      +find_by_id(id: ProductId): Product
-      +save(product: Product): void
-      +find_all(): Product[]
-    }
+  class ProductService {
+    +create_product(data): Product
+    +get_product(id): Product
+    +update_product(id, data): Product
+    +delete_product(id): bool
+    +search_products(query): Product[]
+    +get_products_by_category(category_id): Product[]
   }
 }
 
-' Relations principales
-Produit "1" -- "*" StockEntite
-Produit "1" -- "*" LigneVente
-Produit "1" -- "*" DemandeApprovisionnement
+' Customer Service Bounded Context
+package "Customer Service" {
+  class Customer {
+    +id: UUID
+    +email: string
+    +first_name: string
+    +last_name: string
+    +phone: string
+    +created_at: datetime
+    +is_active: boolean
+    +authenticate(password): bool
+    +get_full_name(): string
+}
 
-Entite "1" -- "*" StockEntite
-Entite "1" -- "*" Vente
+  class Address {
+    +id: UUID
+    +customer_id: UUID
+    +type: AddressType
+    +street: string
+    +city: string
+    +postal_code: string
+    +province: string
+    +country: string
+    +is_default: boolean
+  }
 
-LigneVente "*" -- "1" Vente
-DemandeApprovisionnement "*" -- "1" Entite
+  enum AddressType {
+    BILLING
+    SHIPPING
+}
 
-TypeEntite -- Entite
-StatutDemande -- DemandeApprovisionnement
+  class CustomerService {
+    +register_customer(data): Customer
+    +authenticate(email, password): Customer
+    +update_profile(id, data): Customer
+    +add_address(customer_id, address): Address
+    +get_customer_addresses(customer_id): Address[]
+  }
+}
 
-' Relations services
-ServiceVente ..> Vente : crée
-ServiceApprovisionnement ..> DemandeApprovisionnement : gère
-ServiceTableauBord ..> Vente : analyse
+' Cart Service Bounded Context
+package "Cart Service" {
+  class Cart {
+    +session_id: string
+    +customer_id: UUID
+    +items: CartItem[]
+    +created_at: datetime
+    +expires_at: datetime
+    +add_item(product_id, quantity): void
+    +remove_item(product_id): void
+    +update_quantity(product_id, quantity): void
+    +clear(): void
+    +calculate_total(): Decimal
+    +calculate_taxes(): Decimal
+}
 
-' Relations DDD
-Product *-- ProductId
-Product *-- ProductName
-Product *-- Money
-Product *-- StockQuantity
-Product ..> ProductCreatedEvent : émet
-ProductDomainService ..> Product : gère
-IProductRepository ..> Product : persiste
+  class CartItem {
+    +product_id: UUID
+    +quantity: int
+    +unit_price: Decimal
+    +subtotal(): Decimal
+  }
 
-note top of "API Bounded Contexts"
-  Architecture DDD pour API REST
-  Value Objects avec validation
-  Aggregates avec logique métier
-  Domain Events pour découplage
+  class CartService {
+    +get_cart(session_id): Cart
+    +add_to_cart(session_id, product_id, quantity): Cart
+    +update_cart_item(session_id, product_id, quantity): Cart
+    +remove_from_cart(session_id, product_id): Cart
+    +clear_cart(session_id): void
+    +calculate_taxes(cart): TaxCalculation
+}
+
+  class TaxCalculation {
+    +gst: Decimal
+    +qst: Decimal
+    +total_tax: Decimal
+    +total_with_tax: Decimal
+  }
+}
+
+' Order Service Bounded Context
+package "Order Service" {
+  class Order {
+    +id: UUID
+    +customer_id: UUID
+    +order_number: string
+    +status: OrderStatus
+    +items: OrderItem[]
+    +shipping_address: Address
+    +billing_address: Address
+    +subtotal: Decimal
+    +tax_amount: Decimal
+    +total_amount: Decimal
+    +created_at: datetime
+    +update_status(status): void
+    +add_item(product_id, quantity, price): void
+}
+
+  class OrderItem {
+    +id: UUID
+    +order_id: UUID
+    +product_id: UUID
+    +quantity: int
+    +unit_price: Decimal
+    +total_price: Decimal
+  }
+
+  enum OrderStatus {
+    PENDING
+    CONFIRMED
+    PROCESSING
+    SHIPPED
+    DELIVERED
+    CANCELLED
+  }
+
+  class OrderService {
+    +create_order(customer_id, cart_data): Order
+    +get_order(id): Order
+    +update_order_status(id, status): Order
+    +get_customer_orders(customer_id): Order[]
+    +process_checkout(checkout_data): Order
+  }
+}
+
+' Inventory Service Bounded Context
+package "Inventory Service" {
+  class Stock {
+    +id: UUID
+    +product_id: UUID
+    +location_type: LocationType
+    +location_id: string
+    +quantity: int
+    +reserved_quantity: int
+    +min_threshold: int
+    +max_threshold: int
+    +last_updated: datetime
+    +available_quantity(): int
+    +is_low_stock(): bool
+    +reserve_stock(quantity): bool
+    +release_stock(quantity): void
+  }
+
+  enum LocationType {
+    STORE
+    WAREHOUSE
+    ECOMMERCE
+  }
+  
+  class StockMovement {
+    +id: UUID
+    +stock_id: UUID
+    +movement_type: MovementType
+    +quantity: int
+    +reference_id: UUID
+    +reference_type: string
+    +created_at: datetime
+    +notes: string
+  }
+
+  enum MovementType {
+    IN
+    OUT
+    TRANSFER
+    ADJUSTMENT
+    RESERVATION
+    RELEASE
+  }
+
+  class InventoryService {
+    +get_stock(product_id, location): Stock
+    +update_stock(product_id, location, quantity): Stock
+    +reserve_stock(product_id, quantity, location): bool
+    +release_stock(product_id, quantity, location): void
+    +transfer_stock(from_location, to_location, product_id, quantity): void
+    +get_low_stock_alerts(): Stock[]
+    +record_movement(stock_id, type, quantity, reference): StockMovement
+  }
+}
+
+' Sales Service Bounded Context (POS)
+package "Sales Service" {
+  class Sale {
+    +id: UUID
+    +store_id: string
+    +cashier_id: string
+    +items: SaleItem[]
+    +payment_method: PaymentMethod
+    +subtotal: Decimal
+    +tax_amount: Decimal
+    +total_amount: Decimal
+    +timestamp: datetime
+    +receipt_number: string
+    +add_item(product_id, quantity, price): void
+    +calculate_total(): Decimal
+  }
+
+  class SaleItem {
+    +id: UUID
+    +sale_id: UUID
+    +product_id: UUID
+    +quantity: int
+    +unit_price: Decimal
+    +discount: Decimal
+    +total_price: Decimal
+  }
+
+  enum PaymentMethod {
+    CASH
+    CREDIT_CARD
+    DEBIT_CARD
+    MOBILE_PAYMENT
+  }
+
+  class Return {
+    +id: UUID
+    +original_sale_id: UUID
+    +items: ReturnItem[]
+    +reason: string
+    +total_refund: Decimal
+    +processed_at: datetime
+    +processed_by: string
+  }
+
+  class ReturnItem {
+    +id: UUID
+    +return_id: UUID
+    +product_id: UUID
+    +quantity: int
+    +refund_amount: Decimal
+  }
+
+  class SalesService {
+    +create_sale(store_id, cashier_id): Sale
+    +add_sale_item(sale_id, product_id, quantity): Sale
+    +process_payment(sale_id, payment_method): Sale
+    +process_return(sale_id, items, reason): Return
+    +get_daily_sales(store_id, date): Sale[]
+  }
+    }
+    
+' Reporting Service Bounded Context
+package "Reporting Service" {
+  class SalesReport {
+    +report_id: UUID
+    +period_start: datetime
+    +period_end: datetime
+    +total_sales: Decimal
+    +total_transactions: int
+    +top_products: ProductSalesData[]
+    +sales_by_store: StoreSalesData[]
+    +generated_at: datetime
+    }
+    
+  class ProductSalesData {
+    +product_id: UUID
+    +product_name: string
+    +quantity_sold: int
+    +revenue: Decimal
+    +rank: int
+  }
+
+  class StoreSalesData {
+    +store_id: string
+    +store_name: string
+    +total_sales: Decimal
+    +transaction_count: int
+    +average_transaction: Decimal
+  }
+
+  class DashboardMetrics {
+    +total_revenue_today: Decimal
+    +total_orders_today: int
+    +top_selling_products: ProductSalesData[]
+    +low_stock_alerts: int
+    +active_customers: int
+    +conversion_rate: Decimal
+  }
+
+  class ReportingService {
+    +generate_sales_report(start_date, end_date): SalesReport
+    +get_dashboard_metrics(): DashboardMetrics
+    +get_product_performance(product_id, period): ProductSalesData
+    +get_store_comparison(period): StoreSalesData[]
+    +export_report(report_id, format): file
+  }
+}
+
+' Kong API Gateway Configuration
+package "Kong Gateway" {
+  class Service {
+    +name: string
+    +url: string
+    +protocol: string
+    +host: string
+    +port: int
+    +path: string
+  }
+
+  class Route {
+    +name: string
+    +service: Service
+    +paths: string[]
+    +methods: string[]
+    +strip_path: boolean
+  }
+
+  class Consumer {
+    +username: string
+    +custom_id: string
+    +tags: string[]
+  }
+
+  class Plugin {
+    +name: string
+    +config: dict
+    +enabled: boolean
+  }
+
+  class Upstream {
+    +name: string
+    +algorithm: string
+    +targets: Target[]
+  }
+
+  class Target {
+    +target: string
+    +weight: int
+    +upstream: Upstream
+  }
+}
+
+' Relations between services
+Product ||--o{ Category : "belongs to"
+Customer ||--o{ Address : "has many"
+Cart ||--o{ CartItem : "contains"
+Order ||--o{ OrderItem : "contains"
+Stock ||--o{ StockMovement : "tracks"
+Sale ||--o{ SaleItem : "contains"
+Return ||--o{ ReturnItem : "contains"
+
+' Service relations
+ProductService --> Product
+CustomerService --> Customer
+CartService --> Cart
+OrderService --> Order
+InventoryService --> Stock
+SalesService --> Sale
+ReportingService --> SalesReport
+
+' Kong Gateway relations
+Service ||--o{ Route : "has routes"
+Consumer ||--o{ Plugin : "has plugins"
+Upstream ||--o{ Target : "load balances"
+Route ||--o{ Plugin : "applies plugins"
+
+' Cross-service relationships (via API calls)
+CartItem ..> Product : "references"
+OrderItem ..> Product : "references"
+SaleItem ..> Product : "references"
+Stock ..> Product : "tracks inventory for"
+
+note top of "Product Service"
+  Port: 8001
+  Database: product_db (PostgreSQL)
+  Responsibilities:
+  - Product catalog management
+  - Category hierarchy
+  - Product search and filtering
 end note
 
-note bottom of Produit
-  Entités legacy utilisées par
-  Console et Web
+note top of "Customer Service"
+  Port: 8005
+  Database: customer_db (PostgreSQL)
+  Responsibilities:
+  - Customer registration/authentication
+  - Profile management
+  - Address management
+end note
+
+note top of "Cart Service"
+  Port: 8006 (Load Balanced)
+  Database: Redis cache
+  Responsibilities:
+  - Shopping cart sessions
+  - Tax calculations
+  - Cart persistence
+end note
+
+note top of "Order Service"
+  Port: 8007
+  Database: order_db (PostgreSQL)
+  Responsibilities:
+  - Order lifecycle management
+  - Checkout processing
+  - Order tracking
+end note
+
+note top of "Inventory Service"
+  Port: 8002
+  Database: inventory_db (PostgreSQL)
+  Responsibilities:
+  - Stock management
+  - Multi-location inventory
+  - Stock reservations
+end note
+
+note top of "Sales Service"
+  Port: 8003
+  Database: sales_db (PostgreSQL)
+  Responsibilities:
+  - POS transactions
+  - In-store sales
+  - Returns processing
+end note
+
+note top of "Reporting Service"
+  Port: 8004
+  Database: reporting_db (PostgreSQL)
+  Responsibilities:
+  - Analytics and reporting
+  - Dashboard metrics
+  - Performance tracking
+end note
+
+note bottom of "Kong Gateway"
+  Port: 8080
+  Features:
+  - API Gateway and load balancer
+  - Authentication (API Key + JWT)
+  - Rate limiting and CORS
+  - Service discovery and routing
+  - Health checks and monitoring
 end note
 
 @enduml

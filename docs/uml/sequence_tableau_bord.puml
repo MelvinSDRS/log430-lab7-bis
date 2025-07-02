@@ -1,36 +1,180 @@
 @startuml
-participant "Gestionnaire MM" as GM
-participant "Interface Web" as UI
-participant "ServiceTableauBord" as STB
-participant "RepositoryVente" as RV
-participant "Base de Données" as BD
+title Cart Service Load Balancing - Kong Gateway Upstream Management
 
-GM -> UI: UC3 - Accéder tableau de bord
-UI -> STB: calculer_indicateurs_performance()
-activate STB
+actor "Client Mobile" as MOBILE
+participant "Kong Gateway" as KONG
+participant "Cart Upstream" as UPSTREAM
+participant "Cart Service 1" as CART1
+participant "Cart Service 2" as CART2
+participant "Cart Service 3" as CART3
+database "Redis Cache" as REDIS
 
-STB -> RV: obtenir_donnees_journalieres()
-activate RV
-RV -> BD: SELECT ventes, stocks du jour
-BD --> RV: données temps réel
-RV --> STB: indicateurs bruts
-deactivate RV
+' 1. Kong Health Checks (Background Process)
+loop every 15 seconds
+    KONG -> CART1 : GET /health
+    activate CART1
+    CART1 --> KONG : 200 OK {"status": "healthy", "instance": "cart-1"}
+    deactivate CART1
+    
+    KONG -> CART2 : GET /health
+    activate CART2
+    CART2 --> KONG : 200 OK {"status": "healthy", "instance": "cart-2"}
+    deactivate CART2
+    
+    KONG -> CART3 : GET /health
+    activate CART3
+    CART3 --> KONG : 200 OK {"status": "healthy", "instance": "cart-3"}
+    deactivate CART3
+    
+    KONG -> KONG : update upstream health status
+end
 
-STB -> STB: calculer_kpi()
-note right: CA jour, nb ventes,\nstocks faibles, tendances
+' 2. Client Request - Add to Cart
+MOBILE -> KONG : POST /api/v1/cart/items\n{\n  "product_id": "prod-123",\n  "quantity": 2,\n  "session_id": "mobile-session-456"\n}
+activate KONG
 
-STB --> UI: IndicateurPerformance
-deactivate STB
+' 3. Kong Load Balancing Decision
+KONG -> UPSTREAM : route request using least-connections algorithm
+activate UPSTREAM
+note right of UPSTREAM
+  Load Balancing Algorithm: least-connections
+  Current connections:
+  - Cart Service 1: 3 active
+  - Cart Service 2: 2 active  ← Selected
+  - Cart Service 3: 4 active
+end note
 
-UI -> UI: formater_dashboard()
-UI --> GM: Affichage tableau de bord
+UPSTREAM -> CART2 : forward request to Cart Service 2
+deactivate UPSTREAM
+activate CART2
 
-note right of UI
-  UC3: Supervision web
-  - Chiffre d'affaires du jour
-  - Nombre de ventes
-  - Alertes stocks faibles
-  - Refresh automatique
+' 4. Cart Service Processing
+CART2 -> REDIS : HGETALL cart:mobile-session-456
+activate REDIS
+REDIS --> CART2 : existing cart data or empty
+deactivate REDIS
+
+CART2 -> REDIS : HSET cart:mobile-session-456 product:prod-123 quantity:2
+activate REDIS
+REDIS --> CART2 : cart item added
+deactivate REDIS
+
+CART2 -> REDIS : EXPIRE cart:mobile-session-456 3600
+activate REDIS
+note right : Set cart expiration to 1 hour
+REDIS --> CART2 : expiration set
+deactivate REDIS
+
+CART2 --> KONG : 200 OK\n{\n  "cart_id": "mobile-session-456",\n  "items": [...],\n  "total": 89.98,\n  "instance": "cart-service-2"\n}
+deactivate CART2
+KONG --> MOBILE : 200 OK + cart data
+deactivate KONG
+
+' 5. Simulate Cart Service 2 Failure
+note over CART2 : Cart Service 2 becomes unhealthy
+CART2 -> CART2 : service goes down
+activate CART2 #red
+
+' 6. Health Check Detects Failure
+KONG -> CART2 : GET /health
+CART2 --> KONG : Connection timeout/error
+deactivate CART2
+KONG -> KONG : mark Cart Service 2 as unhealthy
+
+' 7. Subsequent Request with Failover
+MOBILE -> KONG : PUT /api/v1/cart/items/prod-123\n{\n  "quantity": 3,\n  "session_id": "mobile-session-456"\n}
+activate KONG
+
+KONG -> UPSTREAM : route request (exclude unhealthy instance)
+activate UPSTREAM
+note right of UPSTREAM
+  Updated Load Balancing:
+  - Cart Service 1: 3 active ← Selected
+  - Cart Service 2: UNHEALTHY (excluded)
+  - Cart Service 3: 4 active
+end note
+
+UPSTREAM -> CART1 : forward request to Cart Service 1
+deactivate UPSTREAM
+activate CART1
+
+' 8. Session Recovery via Redis
+CART1 -> REDIS : HGETALL cart:mobile-session-456
+activate REDIS
+note right : Cart state preserved in Redis\nacross service instances
+REDIS --> CART1 : existing cart data from previous instance
+deactivate REDIS
+
+CART1 -> REDIS : HSET cart:mobile-session-456 product:prod-123 quantity:3
+activate REDIS
+REDIS --> CART1 : cart updated
+deactivate REDIS
+
+CART1 --> KONG : 200 OK\n{\n  "cart_id": "mobile-session-456",\n  "items": [...],\n  "total": 134.97,\n  "instance": "cart-service-1"\n}
+deactivate CART1
+KONG --> MOBILE : 200 OK + updated cart
+deactivate KONG
+
+' 9. Service Recovery
+note over CART2 : Cart Service 2 recovers
+activate CART2
+CART2 -> CART2 : service restarts
+
+' 10. Health Check Detects Recovery
+KONG -> CART2 : GET /health
+activate CART2
+CART2 --> KONG : 200 OK {"status": "healthy", "instance": "cart-2"}
+deactivate CART2
+KONG -> KONG : mark Cart Service 2 as healthy again
+
+' 11. Load Balancing Resumes Normally
+MOBILE -> KONG : GET /api/v1/cart/mobile-session-456
+activate KONG
+
+KONG -> UPSTREAM : route request (all instances available)
+activate UPSTREAM
+note right of UPSTREAM
+  All services healthy:
+  - Cart Service 1: 2 active
+  - Cart Service 2: 1 active ← Selected (recovered)
+  - Cart Service 3: 3 active
+end note
+
+UPSTREAM -> CART2 : forward request to Cart Service 2
+deactivate UPSTREAM
+activate CART2
+
+CART2 -> REDIS : HGETALL cart:mobile-session-456
+activate REDIS
+REDIS --> CART2 : complete cart state
+deactivate REDIS
+
+CART2 --> KONG : 200 OK + cart data
+deactivate CART2
+KONG --> MOBILE : 200 OK + cart retrieved
+deactivate KONG
+
+note over MOBILE, REDIS
+  Kong Gateway Load Balancing Features:
+  
+  Upstream Configuration:
+  - Algorithm: least-connections (distributes based on active connections)
+  - Health Checks: HTTP GET /health every 15 seconds
+  - Failure Detection: 3 consecutive failures marks instance unhealthy
+  - Recovery Detection: 2 consecutive successes marks instance healthy
+  
+  Cart Service High Availability:
+  - 3 identical service instances for redundancy
+  - Shared Redis cache ensures session persistence
+  - Automatic failover when instances become unhealthy
+  - Seamless recovery when instances return to service
+  - No data loss during instance failures
+  
+  Performance Benefits:
+  - Load distribution prevents service overload
+  - Automatic scaling capabilities
+  - Zero-downtime deployments possible
+  - Circuit breaker prevents cascade failures
 end note
 
 @enduml 

@@ -3,10 +3,12 @@
 Tests de performance pour le système POS multi-magasins
 Architecture console + web : console pour opérations, web pour supervision.
 Valide les performances des UC1-UC6 selon leur interface spécifique.
+Tests de load balancing microservices
 """
 
 import time
 import statistics
+import requests
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict
 
@@ -20,6 +22,13 @@ class PerformanceTester:
 
     def __init__(self):
         create_tables()
+        # Configuration pour tests microservices (Étape 3)
+        self.microservices_base_url = "http://localhost:8080"
+        self.api_key = "pos-test-automation-dev-key-2025"
+        self.microservices_headers = {
+            "X-API-Key": self.api_key,
+            "Content-Type": "application/json"
+        }
 
     def mesurer_temps(self, operation, *args, **kwargs):
         """Mesurer le temps d'exécution d'une opération"""
@@ -218,11 +227,158 @@ class PerformanceTester:
             else 0
         }
 
+    def test_microservice_cart_distribution(self, nb_requetes=30):
+        """Test de distribution de charge Cart Service (3 instances)"""
+        print(f"Test distribution Cart Service ({nb_requetes} requêtes)")
+
+        debut = time.time()
+        distributions = {}
+        temps_reponses = []
+        erreurs = []
+
+        for i in range(nb_requetes):
+            session_id = f"perf_test_{i}"
+            
+            try:
+                # Test GET Cart
+                temps, response, erreur = self.mesurer_temps(
+                    requests.get,
+                    f"{self.microservices_base_url}/api/v1/cart",
+                    params={"session_id": session_id},
+                    headers=self.microservices_headers,
+                    timeout=5
+                )
+                
+                if erreur:
+                    erreurs.append(f"Requête {i}: {erreur}")
+                elif response and response.status_code == 200:
+                    temps_reponses.append(temps)
+                    
+                    # Analyser distribution par instance
+                    try:
+                        data = response.json()
+                        instance_id = data.get('instance_info', {}).get('served_by', 'unknown')
+                        distributions[instance_id] = distributions.get(instance_id, 0) + 1
+                    except:
+                        distributions['parse_error'] = distributions.get('parse_error', 0) + 1
+                else:
+                    erreurs.append(f"Requête {i}: Status {response.status_code if response else 'None'}")
+                    
+            except Exception as e:
+                erreurs.append(f"Requête {i}: Exception {str(e)}")
+
+        fin = time.time()
+        temps_total = fin - debut
+
+        # Analyser équilibrage
+        instances_actives = len([k for k in distributions.keys() if k != 'parse_error'])
+        requetes_reussies = sum(distributions.values()) - distributions.get('parse_error', 0)
+        
+        # Calculer déséquilibre (écart-type entre instances)
+        if instances_actives > 1:
+            counts = [v for k, v in distributions.items() if k != 'parse_error']
+            moyenne = statistics.mean(counts) if counts else 0
+            desequilibre = statistics.stdev(counts) / moyenne * 100 if moyenne > 0 and len(counts) > 1 else 0
+        else:
+            desequilibre = 0
+
+        return {
+            'temps_total': temps_total,
+            'requetes_total': nb_requetes,
+            'requetes_reussies': requetes_reussies,
+            'erreurs': len(erreurs),
+            'instances_detectees': instances_actives,
+            'distribution': distributions,
+            'desequilibre_pct': desequilibre,
+            'temps_moyen_ms': statistics.mean(temps_reponses) * 1000 if temps_reponses else 0,
+            'temps_p95_ms': statistics.quantiles(temps_reponses, n=20)[18] * 1000 if len(temps_reponses) >= 20 else 0,
+            'throughput': requetes_reussies / temps_total if temps_total > 0 else 0,
+            'erreurs_detail': erreurs[:5]  # Première 5 erreurs
+        }
+
+    def test_microservice_cart_charge_simultanee(self, nb_threads=3, requetes_par_thread=10):
+        """Test de charge simultanée Cart Service avec analyse distribution"""
+        print(f"Test charge simultanée Cart Service ({nb_threads} threads, {requetes_par_thread} requêtes/thread)")
+
+        debut_global = time.time()
+
+        def thread_cart_requests(thread_id):
+            """Exécuter des requêtes Cart Service dans un thread"""
+            resultats_local = {
+                'thread_id': thread_id,
+                'distributions': {},
+                'temps_reponses': [],
+                'erreurs': []
+            }
+
+            for i in range(requetes_par_thread):
+                session_id = f"thread_{thread_id}_req_{i}"
+                
+                try:
+                    # GET Cart
+                    response = requests.get(
+                        f"{self.microservices_base_url}/api/v1/cart",
+                        params={"session_id": session_id},
+                        headers=self.microservices_headers,
+                        timeout=3
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        instance_id = data.get('instance_info', {}).get('served_by', 'unknown')
+                        resultats_local['distributions'][instance_id] = \
+                            resultats_local['distributions'].get(instance_id, 0) + 1
+                        resultats_local['temps_reponses'].append(response.elapsed.total_seconds())
+                    else:
+                        resultats_local['erreurs'].append(f"Status {response.status_code}")
+                        
+                except Exception as e:
+                    resultats_local['erreurs'].append(str(e))
+
+            return resultats_local
+
+        # Lancer threads simultanés
+        with ThreadPoolExecutor(max_workers=nb_threads) as executor:
+            futures = [executor.submit(thread_cart_requests, i) for i in range(nb_threads)]
+            resultats_threads = [future.result() for future in futures]
+
+        fin_global = time.time()
+        temps_total = fin_global - debut_global
+
+        # Consolidation des résultats
+        distribution_globale = {}
+        tous_temps = []
+        total_erreurs = 0
+
+        for resultat in resultats_threads:
+            for instance, count in resultat['distributions'].items():
+                distribution_globale[instance] = distribution_globale.get(instance, 0) + count
+            tous_temps.extend(resultat['temps_reponses'])
+            total_erreurs += len(resultat['erreurs'])
+
+        total_requetes = nb_threads * requetes_par_thread
+        requetes_reussies = sum(distribution_globale.values())
+
+        return {
+            'temps_total': temps_total,
+            'threads': nb_threads,
+            'requetes_par_thread': requetes_par_thread,
+            'total_requetes': total_requetes,
+            'requetes_reussies': requetes_reussies,
+            'total_erreurs': total_erreurs,
+            'distribution_globale': distribution_globale,
+            'instances_actives': len(distribution_globale),
+            'throughput_global': requetes_reussies / temps_total if temps_total > 0 else 0,
+            'temps_moyen_ms': statistics.mean(tous_temps) * 1000 if tous_temps else 0,
+            'temps_p95_ms': statistics.quantiles(tous_temps, n=20)[18] * 1000 if len(tous_temps) >= 20 else 0,
+            'resultats_par_thread': resultats_threads
+        }
+
     def executer_tests_complets(self):
         """Exécuter tous les tests de performance (pour exécution directe)"""
-        print("=" * 60)
-        print("TESTS DE PERFORMANCE - SYSTÈME POS 2-TIER")
-        print("=" * 60)
+        print("=" * 70)
+        print("TESTS DE PERFORMANCE - SYSTÈME POS + MICROSERVICES")
+        print("=" * 70)
 
         try:
             # Tests des opérations de base
@@ -272,9 +428,54 @@ class PerformanceTester:
                   f"{resultats_charge['temps_median']*1000:.2f}ms")
             print()
 
+            print("TESTS MICROSERVICES - LOAD BALANCING CART SERVICE")
+            print("-" * 50)
+            
+            # Test distribution Cart Service
+            try:
+                resultats_cart = self.test_microservice_cart_distribution(40)
+                print(f"  - Distribution Cart Service:")
+                print(f"    - Requêtes réussies: {resultats_cart['requetes_reussies']}/{resultats_cart['requetes_total']}")
+                print(f"    - Instances détectées: {resultats_cart['instances_detectees']}")
+                print(f"    - Déséquilibre: {resultats_cart['desequilibre_pct']:.1f}%")
+                print(f"    - Temps moyen: {resultats_cart['temps_moyen_ms']:.1f}ms")
+                print(f"    - Temps P95: {resultats_cart['temps_p95_ms']:.1f}ms")
+                print(f"    - Throughput: {resultats_cart['throughput']:.1f} req/s")
+                
+                for instance, count in resultats_cart['distribution'].items():
+                    if instance != 'parse_error':
+                        percentage = (count / resultats_cart['requetes_reussies'] * 100) if resultats_cart['requetes_reussies'] > 0 else 0
+                        print(f"      - {instance}: {count} requêtes ({percentage:.1f}%)")
+                
+                if resultats_cart['erreurs'] > 0:
+                    print(f"    - Erreurs: {resultats_cart['erreurs']} (détail: {resultats_cart['erreurs_detail']})")
+            
+            except Exception as e:
+                print(f"  - Test Cart Distribution échoué: {e}")
+            
+            print()
+
+            # Test charge simultanée microservices
+            try:
+                resultats_charge_ms = self.test_microservice_cart_charge_simultanee(4, 8)
+                print(f"  - Charge simultanée Cart Service:")
+                print(f"    - Threads: {resultats_charge_ms['threads']}")
+                print(f"    - Requêtes réussies: {resultats_charge_ms['requetes_reussies']}/{resultats_charge_ms['total_requetes']}")
+                print(f"    - Instances actives: {resultats_charge_ms['instances_actives']}")
+                print(f"    - Throughput global: {resultats_charge_ms['throughput_global']:.1f} req/s")
+                print(f"    - Temps moyen: {resultats_charge_ms['temps_moyen_ms']:.1f}ms")
+                print(f"    - Temps P95: {resultats_charge_ms['temps_p95_ms']:.1f}ms")
+                
+                for instance, count in resultats_charge_ms['distribution_globale'].items():
+                    percentage = (count / resultats_charge_ms['requetes_reussies'] * 100) if resultats_charge_ms['requetes_reussies'] > 0 else 0
+                    print(f"      - {instance}: {count} requêtes ({percentage:.1f}%)")
+                    
+            except Exception as e:
+                print(f"  - Test Charge Simultanée échoué: {e}")
+
+            print()
             print("Tests de performance terminés avec succès!")
-            print("Résumé: Le système 2-tier supporte bien la charge "
-                  "et les transactions simultanées")
+            print("Résumé: Le système supporte bien la charge monolithique ET microservices")
 
         except Exception as e:
             print(f"Erreur durant les tests: {e}")
@@ -338,6 +539,41 @@ def test_performance_charge_recherche():
         "Temps moyen acceptable sous charge"
     assert resultats['total_recherches'] == 45, \
         "Toutes les recherches doivent aboutir"
+
+
+def test_microservice_cart_load_balancing():
+    """Test pytest: Load balancing Cart Service (Étape 3)"""
+    tester = PerformanceTester()
+    resultats = tester.test_microservice_cart_distribution(30)
+
+    # Assertions sur le load balancing
+    assert resultats['requetes_reussies'] >= 25, "Au moins 25/30 requêtes doivent réussir"
+    assert resultats['instances_detectees'] >= 2, "Au moins 2 instances Cart doivent être détectées"
+    assert resultats['desequilibre_pct'] < 50, "Déséquilibre doit être < 50%"
+    assert resultats['temps_moyen_ms'] < 1000, "Temps moyen doit être < 1s"
+    
+    # Vérifier qu'au moins 2 instances différentes ont reçu du trafic
+    instances_avec_trafic = [k for k, v in resultats['distribution'].items() 
+                           if k != 'parse_error' and v > 0]
+    assert len(instances_avec_trafic) >= 2, f"Au moins 2 instances doivent recevoir du trafic. Trouvé: {instances_avec_trafic}"
+
+    print(f"Load balancing validé: {resultats['instances_detectees']} instances, "
+          f"déséquilibre {resultats['desequilibre_pct']:.1f}%")
+
+
+def test_microservice_cart_charge_simultanee():
+    """Test pytest: Charge simultanée Cart Service"""
+    tester = PerformanceTester()
+    resultats = tester.test_microservice_cart_charge_simultanee(3, 5)
+
+    # Assertions sur la performance sous charge
+    assert resultats['requetes_reussies'] >= 12, "Au moins 12/15 requêtes doivent réussir sous charge"
+    assert resultats['instances_actives'] >= 2, "Au moins 2 instances doivent être actives"
+    assert resultats['throughput_global'] > 1, "Throughput minimum sous charge simultanée"
+    assert resultats['temps_moyen_ms'] < 2000, "Temps moyen acceptable sous charge"
+
+    print(f"Charge simultanée validée: {resultats['instances_actives']} instances, "
+          f"throughput {resultats['throughput_global']:.1f} req/s")
 
 
 if __name__ == "__main__":

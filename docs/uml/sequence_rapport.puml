@@ -1,45 +1,172 @@
 @startuml
-participant "Gestionnaire MM" as GM
-participant "Console Admin" as UI
-participant "ServiceRapport" as SR
-participant "ServiceTableauBord" as STB
-participant "RepositoryVente" as RV
-participant "RepositoryEntite" as RE
-participant "Base de Données" as BD
+title Reporting Dashboard - Microservices Data Aggregation
 
-GM -> UI: UC1 - Générer rapport (période)
-UI -> SR: generer_rapport_consolide(date_debut, date_fin)
-activate SR
+actor "Gestionnaire" as MANAGER
+participant "Kong Gateway" as KONG
+participant "Reporting Service" as REPORTING_SVC
+participant "Sales Service" as SALES_SVC
+participant "Inventory Service" as INVENTORY_SVC
+participant "Product Service" as PRODUCT_SVC
+participant "Order Service" as ORDER_SVC
+database "Reporting DB" as REPORTING_DB
+database "Sales DB" as SALES_DB
+database "Inventory DB" as INVENTORY_DB
+database "Product DB" as PRODUCT_DB
+database "Order DB" as ORDER_DB
 
-SR -> RE: lister_magasins()
-activate RE
-RE -> BD: SELECT entites WHERE type='MAGASIN'
-BD --> RE: liste magasins
-RE --> SR: magasins
-deactivate RE
+' 1. Manager Authentication
+MANAGER -> KONG : GET /api/v1/dashboard (JWT token)
+activate KONG
+KONG -> KONG : validate JWT token + permissions
+KONG -> REPORTING_SVC : get_dashboard_metrics()
+activate REPORTING_SVC
 
-SR -> RV: obtenir_ventes_toutes_entites(periode)
-activate RV
-RV -> BD: SELECT ventes avec entités
-BD --> RV: données consolidées
-RV --> SR: ventes par magasin
-deactivate RV
+' 2. Aggregate Sales Data (POS + E-commerce)
+REPORTING_SVC -> SALES_SVC : get_daily_sales(today)
+activate SALES_SVC
+SALES_SVC -> SALES_DB : SELECT SUM(total_amount) FROM sales WHERE date = today
+SALES_DB --> SALES_SVC : pos_revenue = $12,450
+SALES_SVC --> REPORTING_SVC : POS sales data
+deactivate SALES_SVC
 
-SR -> STB: calculer_indicateurs_globaux(ventes)
-activate STB
-STB -> STB: analyser CA, tendances, top produits
-STB --> SR: indicateurs consolidés
-deactivate STB
+REPORTING_SVC -> ORDER_SVC : get_daily_orders(today)
+activate ORDER_SVC
+ORDER_SVC -> ORDER_DB : SELECT SUM(total_amount) FROM orders WHERE date = today AND status != CANCELLED
+ORDER_DB --> ORDER_SVC : ecommerce_revenue = $8,730
+ORDER_SVC --> REPORTING_SVC : E-commerce orders data
+deactivate ORDER_SVC
 
-SR -> SR: formater_rapport()
-SR --> UI: rapport formaté
-UI --> GM: Affichage console avec tableaux
+' 3. Inventory Alerts
+REPORTING_SVC -> INVENTORY_SVC : get_low_stock_alerts()
+activate INVENTORY_SVC
+INVENTORY_SVC -> INVENTORY_DB : SELECT COUNT(*) FROM stock WHERE quantity < min_threshold
+INVENTORY_DB --> INVENTORY_SVC : low_stock_count = 23
+INVENTORY_SVC --> REPORTING_SVC : inventory alerts
+deactivate INVENTORY_SVC
 
-note right of UI
-  UC1: Interface console
-  Rapport détaillé par magasin
-  Produits les plus vendus
-  Stocks critiques
+' 4. Top Products Analysis
+REPORTING_SVC -> SALES_SVC : get_top_products(period=today, limit=5)
+activate SALES_SVC
+SALES_SVC -> SALES_DB : SELECT product_id, SUM(quantity) as sold FROM sale_items WHERE date = today GROUP BY product_id ORDER BY sold DESC LIMIT 5
+SALES_DB --> SALES_SVC : top_pos_products
+SALES_SVC --> REPORTING_SVC : POS top products
+deactivate SALES_SVC
+
+REPORTING_SVC -> ORDER_SVC : get_top_products(period=today, limit=5)
+activate ORDER_SVC
+ORDER_SVC -> ORDER_DB : SELECT product_id, SUM(quantity) as sold FROM order_items JOIN orders ON order_id WHERE date = today GROUP BY product_id ORDER BY sold DESC LIMIT 5
+ORDER_DB --> ORDER_SVC : top_ecommerce_products
+ORDER_SVC --> REPORTING_SVC : E-commerce top products
+deactivate ORDER_SVC
+
+' 5. Enrich Product Data
+loop for each top product
+    REPORTING_SVC -> PRODUCT_SVC : get_product(product_id)
+    activate PRODUCT_SVC
+    PRODUCT_SVC -> PRODUCT_DB : SELECT name, price, category FROM products WHERE id = product_id
+    PRODUCT_DB --> PRODUCT_SVC : product details
+    PRODUCT_SVC --> REPORTING_SVC : product info
+    deactivate PRODUCT_SVC
+end
+
+' 6. Calculate Performance Metrics
+REPORTING_SVC -> REPORTING_SVC : calculate_conversion_rate()
+note right : (orders / website_visits) * 100
+REPORTING_SVC -> REPORTING_SVC : calculate_average_order_value()
+note right : total_revenue / total_orders
+REPORTING_SVC -> REPORTING_SVC : aggregate_multi_channel_data()
+note right : Combine POS + E-commerce metrics
+
+' 7. Store Dashboard Data
+REPORTING_SVC -> REPORTING_DB : INSERT dashboard_snapshot (date, metrics, top_products, alerts)
+REPORTING_DB --> REPORTING_SVC : snapshot saved
+
+' 8. Return Aggregated Dashboard
+REPORTING_SVC --> KONG : dashboard_metrics {\
+  total_revenue_today: $21,180,\
+  pos_revenue: $12,450,\
+  ecommerce_revenue: $8,730,\
+  total_orders: 89,\
+  low_stock_alerts: 23,\
+  top_products: [...],\
+  conversion_rate: 3.2%,\
+  avg_order_value: $156.80\
+}
+deactivate REPORTING_SVC
+KONG --> MANAGER : 200 OK + dashboard data
+deactivate KONG
+
+' 9. Generate Detailed Report
+MANAGER -> KONG : POST /api/v1/reports/sales-performance
+activate KONG
+KONG -> REPORTING_SVC : generate_sales_report(start_date, end_date, include_channels=["pos", "ecommerce"])
+activate REPORTING_SVC
+
+' 9a. Collect Historical Data
+par Sales Service Data
+    REPORTING_SVC -> SALES_SVC : get_sales_report(start_date, end_date)
+    activate SALES_SVC
+    SALES_SVC -> SALES_DB : Complex aggregation query for POS data
+    SALES_DB --> SALES_SVC : pos_sales_summary
+    SALES_SVC --> REPORTING_SVC : POS performance data
+    deactivate SALES_SVC
+else Order Service Data
+    REPORTING_SVC -> ORDER_SVC : get_orders_report(start_date, end_date)
+    activate ORDER_SVC
+    ORDER_SVC -> ORDER_DB : Complex aggregation query for e-commerce data
+    ORDER_DB --> ORDER_SVC : ecommerce_sales_summary
+    ORDER_SVC --> REPORTING_SVC : E-commerce performance data
+    deactivate ORDER_SVC
+else Inventory Data
+    REPORTING_SVC -> INVENTORY_SVC : get_stock_movements(start_date, end_date)
+    activate INVENTORY_SVC
+    INVENTORY_SVC -> INVENTORY_DB : SELECT movements with aggregations
+    INVENTORY_DB --> INVENTORY_SVC : stock_movement_summary
+    INVENTORY_SVC --> REPORTING_SVC : Inventory performance data
+    deactivate INVENTORY_SVC
+end
+
+' 9b. Generate Comprehensive Report
+REPORTING_SVC -> REPORTING_SVC : merge_multi_channel_data()
+REPORTING_SVC -> REPORTING_SVC : calculate_trends_and_insights()
+REPORTING_SVC -> REPORTING_SVC : format_executive_summary()
+
+REPORTING_SVC -> REPORTING_DB : INSERT sales_report (report_id, period, channels, summary, details)
+REPORTING_DB --> REPORTING_SVC : report stored
+
+REPORTING_SVC --> KONG : report_generated {\
+  report_id: "RPT-2025-001",\
+  period: "2025-01-01 to 2025-01-31",\
+  total_revenue: $456,789,\
+  pos_percentage: 58%,\
+  ecommerce_percentage: 42%,\
+  growth_rate: +12.5%,\
+  download_url: "/api/v1/reports/RPT-2025-001/download"\
+}
+deactivate REPORTING_SVC
+KONG --> MANAGER : 201 Created + report summary
+deactivate KONG
+
+note over MANAGER, ORDER_DB
+  Microservices Reporting Architecture:
+  
+  Data Sources:
+  - Sales Service: POS transactions from physical stores
+  - Order Service: E-commerce orders and checkout data
+  - Inventory Service: Stock levels and movement tracking
+  - Product Service: Product catalog and category data
+  
+  Aggregation Strategy:
+  - Real-time dashboard metrics via service calls
+  - Historical reports via parallel data collection
+  - Cross-service data enrichment for complete picture
+  - Centralized storage for performance optimization
+  
+  Performance Features:
+  - Parallel service calls for faster response
+  - Database per service isolation
+  - Caching of frequently accessed metrics
+  - Kong Gateway routing and authentication
 end note
 
 @enduml 

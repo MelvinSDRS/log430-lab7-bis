@@ -1,0 +1,284 @@
+_format_version: "3.0"
+_transform: true
+
+# Configuration Kong Gateway
+services:
+  - name: product-service
+    url: http://product-service:8001
+    tags: ["microservices", "product"]
+    
+  - name: inventory-service
+    url: http://inventory-service:8002
+    tags: ["microservices", "inventory"]
+    
+  - name: sales-service
+    url: http://sales-service:8003
+    tags: ["microservices", "sales"]
+    
+  - name: reporting-service
+    url: http://reporting-service:8004
+    tags: ["microservices", "reporting"]
+    
+  - name: customer-service
+    url: http://customer-service:8005
+    tags: ["microservices", "customer"]
+    
+  - name: cart-service
+    url: http://cart-upstream
+    tags: ["microservices", "cart", "load-balanced"]
+    
+  - name: order-service
+    url: http://order-service:8007
+    tags: ["microservices", "order"]
+
+upstreams:
+  - name: cart-upstream
+    algorithm: least-connections
+    healthchecks:
+      active:
+        type: http
+        http_path: "/health"
+        healthy:
+          interval: 15
+          successes: 2
+        unhealthy:
+          interval: 15
+          http_failures: 3
+
+targets:
+  - target: cart-service-1:8006
+    upstream: cart-upstream
+    weight: 100
+  - target: cart-service-2:8006
+    upstream: cart-upstream
+    weight: 100
+  - target: cart-service-3:8006
+    upstream: cart-upstream
+    weight: 100
+
+routes:
+  - name: health-check
+    service: product-service
+    paths: ["/health"]
+    methods: ["GET"]
+    strip_path: false
+
+  - name: products-api
+    service: product-service
+    paths: ["/api/v1/products"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    strip_path: false
+
+  - name: categories-api
+    service: product-service
+    paths: ["/api/v1/categories"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    strip_path: false
+
+  - name: inventory-api
+    service: inventory-service
+    paths: ["/api/v1/inventory"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    strip_path: false
+
+  - name: stocks-api
+    service: inventory-service
+    paths: ["/api/v1/stocks"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    strip_path: false
+
+  - name: sales-api
+    service: sales-service
+    paths: ["/api/v1/sales"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    strip_path: false
+
+  - name: transactions-api
+    service: sales-service
+    paths: ["/api/v1/transactions"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    strip_path: false
+
+  - name: reports-api
+    service: reporting-service
+    paths: ["/api/v1/reports"]
+    methods: ["GET"]
+    strip_path: false
+
+  - name: dashboard-api
+    service: reporting-service
+    paths: ["/api/v1/dashboard"]
+    methods: ["GET"]
+    strip_path: false
+
+  - name: customers-api
+    service: customer-service
+    paths: ["/api/v1/customers"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    strip_path: false
+
+  - name: addresses-api
+    service: customer-service
+    paths: ["/api/v1/addresses"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    strip_path: false
+
+  - name: cart-api-loadbalanced
+    service: cart-service
+    paths: ["/api/v1/cart"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    strip_path: false
+
+  - name: cart-taxes-loadbalanced
+    service: cart-service
+    paths: ["/api/v1/cart/taxes"]
+    methods: ["GET", "POST"]
+    strip_path: false
+
+  - name: orders-api
+    service: order-service
+    paths: ["/api/v1/orders"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    strip_path: false
+
+  - name: checkout-api
+    service: order-service
+    paths: ["/api/v1/checkout"]
+    methods: ["POST"]
+    strip_path: false
+
+consumers:
+  - username: pos-api-client
+    custom_id: "external-client"
+    tags: ["external", "production"]
+    keyauth_credentials:
+      - key: "pos-ext-api-2025-prod-key-secure"
+
+  - username: pos-web-app
+    custom_id: "web-frontend"
+    tags: ["web", "frontend"]
+    keyauth_credentials:
+      - key: "pos-web-app-2025-frontend-key"
+
+  - username: pos-mobile-app
+    custom_id: "mobile-client"
+    tags: ["mobile", "production"]
+    keyauth_credentials:
+      - key: "pos-mobile-2025-app-secure-key"
+
+  - username: pos-test-client
+    custom_id: "test-automation"
+    tags: ["testing", "development"]
+    keyauth_credentials:
+      - key: "pos-test-automation-dev-key-2025"
+
+plugins:
+  # Plugins globaux - Fonctionnalités Étape 2
+  - name: cors
+    config:
+      origins: ["http://localhost:3000", "http://localhost:3001", "http://localhost:5000"]
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+      headers: ["Accept", "Accept-Version", "Content-Length", "Content-MD5", "Content-Type", "Date", "X-Auth-Token", "Authorization", "X-API-Key"]
+      exposed_headers: ["X-Auth-Token", "X-Request-ID", "X-Instance-ID"]
+      credentials: true
+      max_age: 3600
+
+  - name: rate-limiting
+    config:
+      minute: 100
+      hour: 1000
+      day: 10000
+      policy: "local"
+      fault_tolerant: true
+
+  - name: correlation-id
+    config:
+      header_name: "X-Request-ID"
+      generator: "uuid"
+      echo_downstream: true
+
+  - name: prometheus
+    config:
+      per_consumer: true
+      status_code_metrics: true
+      latency_metrics: true
+      bandwidth_metrics: true
+
+  - name: request-transformer
+    config:
+      add:
+        headers:
+          - "X-Gateway: kong"
+          - "X-Lab: lab5-microservices"
+
+  # Plugins par route - API Keys
+  - name: key-auth
+    route: products-api
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+      hide_credentials: true
+
+  - name: key-auth
+    route: categories-api
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+
+  - name: key-auth
+    route: inventory-api
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+
+  - name: key-auth
+    route: stocks-api
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+
+  - name: key-auth
+    route: sales-api
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+
+  - name: key-auth
+    route: transactions-api
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+
+  - name: key-auth
+    route: reports-api
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+
+  - name: key-auth
+    route: dashboard-api
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+
+  - name: key-auth
+    route: cart-api-loadbalanced
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+
+  - name: key-auth
+    route: cart-taxes-loadbalanced
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+
+  # Plugin Load Balancing monitoring - Étape 3
+  - name: request-transformer
+    route: cart-api-loadbalanced
+    config:
+      add:
+        headers:
+          - "X-Load-Balanced: true"
+          - "X-Cart-Instances: 3"
+          - "X-LB-Algorithm: least-connections"

@@ -1,93 +1,201 @@
 @startuml
-package "Système POS Multi-Magasins" {
+package "Architecture Microservices Lab 5" {
 
-  ' Interfaces utilisateur
-  package "Couche Présentation" {
-    [Interface Console] as CONSOLE
-    [Interface Web] as WEB
+  ' API Gateway Layer
+  package "API Gateway Layer" {
+    [Kong Gateway] as KONG
+    [Route Management] as ROUTES
+    [Authentication Service] as AUTH
+    [Rate Limiting] as RATE_LIMIT
+    [Load Balancer] as LB
+    [CORS Handler] as CORS
+  }
+  
+  ' Microservices Business Layer
+  package "Microservices Business Layer" {
     
-    package "API REST (DDD)" as API_PKG {
-      [Endpoints REST] as ENDPOINTS
-      [Application Services] as APP_SERVICES
-      package "Bounded Contexts" {
-        [Product Catalog] as PRODUCT_BC
-        [Shared Kernel] as SHARED_BC
-      }
+    package "Product Bounded Context" {
+      [Product Service] as PRODUCT_SVC
+      [Product Domain Logic] as PRODUCT_DOMAIN
+      [Product Repository] as PRODUCT_REPO
+    }
+    
+    package "Inventory Bounded Context" {
+      [Inventory Service] as INVENTORY_SVC
+      [Stock Management] as STOCK_DOMAIN
+      [Inventory Repository] as INVENTORY_REPO
+    }
+    
+    package "Sales Bounded Context" {
+      [Sales Service] as SALES_SVC
+      [Transaction Logic] as SALES_DOMAIN
+      [Sales Repository] as SALES_REPO
+    }
+    
+    package "Reporting Bounded Context" {
+      [Reporting Service] as REPORTING_SVC
+      [Analytics Engine] as ANALYTICS_DOMAIN
+      [Reporting Repository] as REPORTING_REPO
+    }
+    
+    package "Customer Bounded Context" {
+      [Customer Service] as CUSTOMER_SVC
+      [Customer Domain] as CUSTOMER_DOMAIN
+      [Customer Repository] as CUSTOMER_REPO
+    }
+    
+    package "Cart Bounded Context" {
+      [Cart Service Cluster] as CART_CLUSTER
+      [Cart Business Logic] as CART_DOMAIN
+      [Cart Cache Layer] as CART_CACHE_LAYER
+    }
+    
+    package "Order Bounded Context" {
+      [Order Service] as ORDER_SVC
+      [Order Processing] as ORDER_DOMAIN
+      [Order Repository] as ORDER_REPO
     }
   }
   
-  ' Logique métier
-  package "Couche Métier" {
-    [Services Métier Legacy] as SERVICES
-    [Entités Domaine Legacy] as ENTITIES
-    
-    package "DDD Components" {
-      [Value Objects] as VALUE_OBJECTS
-      [Aggregates] as AGGREGATES
-      [Domain Services] as DOMAIN_SERVICES
-      [Domain Events] as DOMAIN_EVENTS
+  ' Data Layer
+  package "Data Persistence Layer" {
+    database "Product DB\n(PostgreSQL)" as PRODUCT_DB
+    database "Inventory DB\n(PostgreSQL)" as INVENTORY_DB
+    database "Sales DB\n(PostgreSQL)" as SALES_DB
+    database "Reporting DB\n(PostgreSQL)" as REPORTING_DB
+    database "Customer DB\n(PostgreSQL)" as CUSTOMER_DB
+    database "Cart Cache\n(Redis)" as CART_CACHE
+    database "Order DB\n(PostgreSQL)" as ORDER_DB
+  }
+  
+  ' Cross-cutting Concerns
+  package "Cross-cutting Concerns" {
+    [Event Bus] as EVENT_BUS
+    [Metrics Collector] as METRICS
+    [Health Checks] as HEALTH
+    [Configuration Service] as CONFIG
+    [Logging Service] as LOGGING
+  }
+  
+  ' Monitoring Stack
+  package "Observability Stack" {
+    [Prometheus] as PROMETHEUS
+    [Grafana Dashboards] as GRAFANA
+    [Kong Admin API] as KONG_ADMIN
     }
   }
   
-  ' Persistance
-  package "Couche Données" {
-    [Repositories Legacy] as REPOS
-    [Repository Adapters] as ADAPTERS
-    [Base PostgreSQL] as DB
-  }
+' External Systems
+package "External Clients" {
+  [E-commerce Frontend] as WEB_APP
+  [Mobile Application] as MOBILE_APP
+  [POS Terminals] as POS_TERMINALS
+  [Admin Dashboard] as ADMIN_DASHBOARD
+  [External APIs] as EXTERNAL_APIS
 }
 
-' Relations Legacy (Console + Web)
-CONSOLE --> SERVICES : Opérations
-WEB --> SERVICES : Supervision
-SERVICES --> ENTITIES
-SERVICES --> REPOS
-REPOS --> DB
+' Kong Gateway internal connections
+KONG *-- ROUTES
+KONG *-- AUTH
+KONG *-- RATE_LIMIT
+KONG *-- LB
+KONG *-- CORS
 
-' Relations API REST (DDD)
-ENDPOINTS --> APP_SERVICES
-APP_SERVICES --> PRODUCT_BC
-APP_SERVICES --> SHARED_BC
-PRODUCT_BC --> AGGREGATES
-PRODUCT_BC --> VALUE_OBJECTS
-PRODUCT_BC --> DOMAIN_SERVICES
-SHARED_BC --> VALUE_OBJECTS
-SHARED_BC --> DOMAIN_EVENTS
-AGGREGATES --> ADAPTERS
-ADAPTERS --> DB
+' API Gateway to Services
+KONG --> PRODUCT_SVC : "Product APIs"
+KONG --> INVENTORY_SVC : "Inventory APIs"
+KONG --> SALES_SVC : "Sales APIs"
+KONG --> REPORTING_SVC : "Reporting APIs"
+KONG --> CUSTOMER_SVC : "Customer APIs"
+KONG --> CART_CLUSTER : "Cart APIs (Load Balanced)"
+KONG --> ORDER_SVC : "Order APIs"
 
-' Annotations
-note right of CONSOLE
-  UC1, UC2, UC4, UC6
-  + Fonctions POS Lab1
-  Architecture legacy
+' Service internal structure
+PRODUCT_SVC *-- PRODUCT_DOMAIN
+PRODUCT_DOMAIN --> PRODUCT_REPO
+INVENTORY_SVC *-- STOCK_DOMAIN
+STOCK_DOMAIN --> INVENTORY_REPO
+SALES_SVC *-- SALES_DOMAIN
+SALES_DOMAIN --> SALES_REPO
+REPORTING_SVC *-- ANALYTICS_DOMAIN
+ANALYTICS_DOMAIN --> REPORTING_REPO
+CUSTOMER_SVC *-- CUSTOMER_DOMAIN
+CUSTOMER_DOMAIN --> CUSTOMER_REPO
+CART_CLUSTER *-- CART_DOMAIN
+CART_DOMAIN --> CART_CACHE_LAYER
+ORDER_SVC *-- ORDER_DOMAIN
+ORDER_DOMAIN --> ORDER_REPO
+
+' Repository to Database connections
+PRODUCT_REPO --> PRODUCT_DB
+INVENTORY_REPO --> INVENTORY_DB
+SALES_REPO --> SALES_DB
+REPORTING_REPO --> REPORTING_DB
+CUSTOMER_REPO --> CUSTOMER_DB
+CART_CACHE_LAYER --> CART_CACHE
+ORDER_REPO --> ORDER_DB
+
+' Inter-service communication
+SALES_SVC ..> INVENTORY_SVC : "Stock validation"
+SALES_SVC ..> PRODUCT_SVC : "Product lookup"
+REPORTING_SVC ..> SALES_SVC : "Sales data aggregation"
+REPORTING_SVC ..> INVENTORY_SVC : "Stock metrics"
+ORDER_SVC ..> CART_CLUSTER : "Cart checkout"
+ORDER_SVC ..> INVENTORY_SVC : "Stock reservation"
+ORDER_SVC ..> CUSTOMER_SVC : "Customer validation"
+
+' Cross-cutting concerns
+PRODUCT_SVC --> EVENT_BUS
+INVENTORY_SVC --> EVENT_BUS
+SALES_SVC --> EVENT_BUS
+ORDER_SVC --> EVENT_BUS
+
+PRODUCT_SVC --> METRICS
+INVENTORY_SVC --> METRICS
+SALES_SVC --> METRICS
+REPORTING_SVC --> METRICS
+CUSTOMER_SVC --> METRICS
+CART_CLUSTER --> METRICS
+ORDER_SVC --> METRICS
+
+' Monitoring connections
+METRICS --> PROMETHEUS
+PROMETHEUS --> GRAFANA
+KONG --> KONG_ADMIN
+
+' Client connections
+WEB_APP --> KONG : "HTTPS/API Key"
+MOBILE_APP --> KONG : "HTTPS/API Key"
+POS_TERMINALS --> KONG : "API Key Auth"
+ADMIN_DASHBOARD --> KONG : "JWT Auth"
+EXTERNAL_APIS --> KONG : "API Key Auth"
+
+note top of KONG
+  Kong Gateway Capabilities:
+  - Unified API endpoint (port 8080)
+  - Authentication (API Key + JWT)
+  - Rate limiting & throttling
+  - Load balancing (Cart Service)
+  - Request/Response transformation
+  - Circuit breaker & health checks
 end note
 
-note right of WEB
-  UC3, UC8
-  Tableau de bord
-  Architecture legacy
+note right of "Microservices Business Layer"
+  Domain-Driven Design:
+  - Each service owns its bounded context
+  - Database per service pattern
+  - Event-driven communication
+  - Service autonomy and independence
+  - Clear business domain separation
 end note
 
-note right of API_PKG
-  UC1, UC2, UC3, UC4
-  Applications externes
-  Architecture DDD
-  Documentation Swagger
-end note
-
-note right of SERVICES
-  ServiceVente
-  ServiceApprovisionnement  
-  ServiceTableauBord
-  (Legacy)
-end note
-
-note right of PRODUCT_BC
-  Aggregate Product
-  Value Objects métier
-  Domain Services
-  Domain Events
+note bottom of CART_CLUSTER
+  Cart Service Load Balancing:
+  - 3 identical instances
+  - Redis shared cache for session state
+  - Kong upstream configuration
+  - Health check monitoring
+  - Automatic failover
 end note
 
 @enduml

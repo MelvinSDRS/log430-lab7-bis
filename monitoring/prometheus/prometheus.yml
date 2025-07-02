@@ -10,6 +10,71 @@ scrape_configs:
     scrape_interval: 5s
     scrape_timeout: 5s
 
+  - job_name: 'kong-gateway'
+    static_configs:
+      - targets: ['api-gateway:8001']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 8s
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'kong_.*'
+        target_label: component
+        replacement: 'api-gateway'
+
+  - job_name: 'microservices-health'
+    static_configs:
+      - targets: 
+        - 'product-service:8001'
+        - 'inventory-service:8002'
+        - 'sales-service:8003'
+        - 'reporting-service:8004'
+        - 'customer-service:8005'
+        - 'cart-service:8006'
+        - 'order-service:8007'
+    metrics_path: '/health'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  - job_name: 'cart-service-loadbalanced'
+    static_configs:
+      - targets: 
+        - 'cart-service-1:8006'
+        - 'cart-service-2:8006'
+        - 'cart-service-3:8006'
+    metrics_path: '/health'
+    scrape_interval: 15s
+    scrape_timeout: 5s
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: 'cart-service-([^:]+):.*'
+        target_label: cart_instance
+        replacement: 'cart-${1}'
+      - source_labels: [__address__]
+        target_label: service_type
+        replacement: 'cart-loadbalanced'
+
+  - job_name: 'cart-instances-metrics'
+    static_configs:
+      - targets: 
+        - 'cart-service-1:8006'
+        - 'cart-service-2:8006'
+        - 'cart-service-3:8006'
+    metrics_path: '/metrics/instance'
+    scrape_interval: 20s
+    scrape_timeout: 8s
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: 'cart-service-([^:]+):.*'
+        target_label: instance_id
+        replacement: 'cart-${1}'
+
   - job_name: 'prometheus'
     static_configs:
-      - targets: ['localhost:9090'] 
+      - targets: ['localhost:9090']
+
+  - job_name: 'docker-containers'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+    scrape_timeout: 10s 

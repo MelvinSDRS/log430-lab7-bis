@@ -1,36 +1,332 @@
 {
 	"info": {
 		"_postman_id": "8b123456-7890-4abc-def0-123456789abc",
-		"name": "POS Multi-Magasins API",
-		"description": "Collection de tests pour l'API REST du système POS Multi-Magasins\n\n## Authentification\nUtilisez le token: `pos-api-token-2025` dans l'en-tête Authorization avec le format `Bearer TOKEN`\n\n## Cas d'usage couverts\n- UC1: Générer un rapport consolidé des ventes\n- UC2: Consulter le stock d'un magasin spécifique\n- UC3: Visualiser les performances globales des magasins\n- UC4: Mettre à jour les informations d'un produit",
+		"name": "POS Multi-Magasins API - Microservices Gateway",
+		"description": "Collection de tests pour l'API REST du système POS Multi-Magasins via Kong API Gateway\n\n## Architecture Microservices\nCette collection teste les 7 microservices via Kong Gateway (port 8080):\n- Product Service (8001) - Catalogue produits\n- Inventory Service (8002) - Gestion stocks\n- Sales Service (8003) - Transactions POS\n- Reporting Service (8004) - Rapports analytiques\n- Customer Service (8005) - Comptes clients\n- Cart Service (8006) - Panier d'achats (load balancé)\n- Order Service (8007) - Commandes\n\n## Authentification\n### API Gateway (Kong)\n- **Header**: `X-API-KEY`\n- **Valeur**: `pos-microservices-2025`\n\n### Services E-commerce (JWT)\n- **Header**: `Authorization`\n- **Format**: `Bearer <jwt_token>`\n- **Login**: POST /api/v1/customers/auth/login\n\n## Cas d'usage couverts\n- UC1: Générer un rapport consolidé des ventes\n- UC2: Consulter le stock d'un magasin spécifique\n- UC3: Visualiser les performances globales des magasins\n- UC4: Mettre à jour les informations d'un produit\n- UC5: Gestion comptes clients (nouveau)\n- UC6: Panier d'achats multi-instances (nouveau)\n- UC7: Commandes e-commerce (nouveau)",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
 		{
-			"name": "Health & Documentation",
+			"name": "Gateway Health & Documentation",
 			"item": [
 				{
-					"name": "Health Check",
+					"name": "Kong Gateway Health Check",
 					"request": {
 						"method": "GET",
-						"header": [],
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
+								"type": "text"
+							}
+						],
 						"url": {
-							"raw": "{{base_url}}/api/health",
-							"host": ["{{base_url}}"],
-							"path": ["api", "health"]
+							"raw": "{{gateway_url}}/health",
+							"host": ["{{gateway_url}}"],
+							"path": ["health"]
 						}
 					},
 					"response": []
 				},
 				{
-					"name": "Swagger Documentation",
+					"name": "Kong Admin API Status",
 					"request": {
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/api/docs",
-							"host": ["{{base_url}}"],
-							"path": ["api", "docs"]
+							"raw": "{{kong_admin_url}}/status",
+							"host": ["{{kong_admin_url}}"],
+							"path": ["status"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "UC5 - E-commerce Authentication",
+			"item": [
+				{
+					"name": "Créer un compte client",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\",\n  \"nom\": \"Dupont\",\n  \"prenom\": \"Jean\",\n  \"telephone\": \"514-123-4567\",\n  \"date_naissance\": \"1990-01-01\"\n}"
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/v1/customers/auth/register",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "v1", "customers", "auth", "register"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Connexion client (JWT)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set('jwt_token', response.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/v1/customers/auth/login",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "v1", "customers", "auth", "login"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Profil client authentifié",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{gateway_url}}/api/v1/customers/profile",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "v1", "customers", "profile"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "UC6 - Cart Service (Load Balanced)",
+			"item": [
+				{
+					"name": "Ajouter produit au panier",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"product_id\": 1,\n  \"quantity\": 2\n}"
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/v1/cart?session_id={{session_id}}",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "v1", "cart"],
+							"query": [
+								{
+									"key": "session_id",
+									"value": "{{session_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Voir contenu du panier",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{gateway_url}}/api/v1/cart?session_id={{session_id}}",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "v1", "cart"],
+							"query": [
+								{
+									"key": "session_id",
+									"value": "{{session_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mettre à jour quantité",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"product_id\": 1,\n  \"quantity\": 5\n}"
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/v1/cart?session_id={{session_id}}",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "v1", "cart"],
+							"query": [
+								{
+									"key": "session_id",
+									"value": "{{session_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Test Load Balancing - Instance Check",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{gateway_url}}/api/v1/cart/health?session_id={{session_id}}",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "v1", "cart", "health"],
+							"query": [
+								{
+									"key": "session_id",
+									"value": "{{session_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "UC7 - Order Service",
+			"item": [
+				{
+					"name": "Créer une commande",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"customer_id\": 1,\n  \"items\": [\n    {\n      \"product_id\": 1,\n      \"quantity\": 2,\n      \"unit_price\": 4.50\n    },\n    {\n      \"product_id\": 2,\n      \"quantity\": 1,\n      \"unit_price\": 12.99\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/v1/orders",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "v1", "orders"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Lister les commandes client",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{gateway_url}}/api/v1/orders?customer_id=1",
+							"host": ["{{gateway_url}}"],
+							"path": ["api", "v1", "orders"],
+							"query": [
+								{
+									"key": "customer_id",
+									"value": "1"
+								}
+							]
 						}
 					},
 					"response": []
@@ -46,14 +342,14 @@
 						"method": "GET",
 						"header": [
 							{
-								"key": "Authorization",
-								"value": "Bearer {{api_token}}",
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
 								"type": "text"
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/api/v1/products?page=1&per_page=10",
-							"host": ["{{base_url}}"],
+							"raw": "{{gateway_url}}/api/v1/products?page=1&per_page=10",
+							"host": ["{{gateway_url}}"],
 							"path": ["api", "v1", "products"],
 							"query": [
 								{
@@ -75,14 +371,14 @@
 						"method": "GET",
 						"header": [
 							{
-								"key": "Authorization",
-								"value": "Bearer {{api_token}}",
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
 								"type": "text"
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/api/v1/products?search=café&sort=nom,asc",
-							"host": ["{{base_url}}"],
+							"raw": "{{gateway_url}}/api/v1/products?search=café&sort=nom,asc",
+							"host": ["{{gateway_url}}"],
 							"path": ["api", "v1", "products"],
 							"query": [
 								{
@@ -104,14 +400,14 @@
 						"method": "GET",
 						"header": [
 							{
-								"key": "Authorization",
-								"value": "Bearer {{api_token}}",
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
 								"type": "text"
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/api/v1/products/1",
-							"host": ["{{base_url}}"],
+							"raw": "{{gateway_url}}/api/v1/products/1",
+							"host": ["{{gateway_url}}"],
 							"path": ["api", "v1", "products", "1"]
 						}
 					},
@@ -123,8 +419,8 @@
 						"method": "POST",
 						"header": [
 							{
-								"key": "Authorization",
-								"value": "Bearer {{api_token}}",
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
 								"type": "text"
 							},
 							{
@@ -135,11 +431,11 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"nom\": \"Café API Test\",\n  \"prix\": 4.50,\n  \"stock\": 200,\n  \"id_categorie\": 1,\n  \"seuil_alerte\": 15,\n  \"description\": \"Produit de test créé via API\"\n}"
+							"raw": "{\n  \"nom\": \"Café API Test via Gateway\",\n  \"prix\": 4.50,\n  \"stock\": 200,\n  \"id_categorie\": 1,\n  \"seuil_alerte\": 15,\n  \"description\": \"Produit de test créé via Kong API Gateway\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/v1/products",
-							"host": ["{{base_url}}"],
+							"raw": "{{gateway_url}}/api/v1/products",
+							"host": ["{{gateway_url}}"],
 							"path": ["api", "v1", "products"]
 						}
 					},
@@ -151,8 +447,8 @@
 						"method": "PUT",
 						"header": [
 							{
-								"key": "Authorization",
-								"value": "Bearer {{api_token}}",
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
 								"type": "text"
 							},
 							{
@@ -163,11 +459,11 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"nom\": \"Café API Test Modifié\",\n  \"prix\": 5.00,\n  \"seuil_alerte\": 20,\n  \"description\": \"Description mise à jour via API\"\n}"
+							"raw": "{\n  \"nom\": \"Café API Test Gateway Modifié\",\n  \"prix\": 5.00,\n  \"seuil_alerte\": 20,\n  \"description\": \"Description mise à jour via Kong Gateway\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/v1/products/{{product_id}}",
-							"host": ["{{base_url}}"],
+							"raw": "{{gateway_url}}/api/v1/products/{{product_id}}",
+							"host": ["{{gateway_url}}"],
 							"path": ["api", "v1", "products", "{{product_id}}"]
 						}
 					},
@@ -179,14 +475,14 @@
 						"method": "DELETE",
 						"header": [
 							{
-								"key": "Authorization",
-								"value": "Bearer {{api_token}}",
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
 								"type": "text"
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/api/v1/products/{{product_id}}",
-							"host": ["{{base_url}}"],
+							"raw": "{{gateway_url}}/api/v1/products/{{product_id}}",
+							"host": ["{{gateway_url}}"],
 							"path": ["api", "v1", "products", "{{product_id}}"]
 						}
 					},
@@ -503,116 +799,55 @@
 			]
 		},
 		{
-			"name": "Tests d'Authentification",
+			"name": "Tests Sécurité Gateway",
 			"item": [
 				{
-					"name": "Test sans authentification (401)",
+					"name": "Test sans API Key (401)",
 					"request": {
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{base_url}}/api/v1/products",
-							"host": ["{{base_url}}"],
+							"raw": "{{gateway_url}}/api/v1/products",
+							"host": ["{{gateway_url}}"],
 							"path": ["api", "v1", "products"]
 						}
 					},
 					"response": []
 				},
 				{
-					"name": "Test avec token invalide (401)",
+					"name": "Test API Key invalide (401)",
 					"request": {
 						"method": "GET",
 						"header": [
 							{
-								"key": "Authorization",
-								"value": "Bearer invalid-token",
+								"key": "X-API-KEY",
+								"value": "invalid-key",
 								"type": "text"
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/api/v1/products",
-							"host": ["{{base_url}}"],
+							"raw": "{{gateway_url}}/api/v1/products",
+							"host": ["{{gateway_url}}"],
 							"path": ["api", "v1", "products"]
 						}
 					},
 					"response": []
-				}
-			]
-		},
-		{
-			"name": "Tests d'Erreurs",
-			"item": [
+				},
 				{
-					"name": "Ressource inexistante (404)",
+					"name": "Test Rate Limiting",
 					"request": {
 						"method": "GET",
 						"header": [
 							{
-								"key": "Authorization",
-								"value": "Bearer {{api_token}}",
+								"key": "X-API-KEY",
+								"value": "{{gateway_api_key}}",
 								"type": "text"
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}/api/v1/products/99999",
-							"host": ["{{base_url}}"],
-							"path": ["api", "v1", "products", "99999"]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Données invalides pour création produit (400)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{api_token}}",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"nom\": \"Produit sans prix\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/products",
-							"host": ["{{base_url}}"],
+							"raw": "{{gateway_url}}/api/v1/products",
+							"host": ["{{gateway_url}}"],
 							"path": ["api", "v1", "products"]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Données invalides pour rapport (400)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{api_token}}",
-								"type": "text"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json",
-								"type": "text"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"date_debut\": \"2025-01-01\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/v1/reports/sales/consolidated",
-							"host": ["{{base_url}}"],
-							"path": ["api", "v1", "reports", "sales", "consolidated"]
 						}
 					},
 					"response": []
@@ -626,7 +861,10 @@
 			"script": {
 				"type": "text/javascript",
 				"exec": [
-					""
+					"// Générer session_id aléatoire pour les tests panier",
+					"if (!pm.collectionVariables.get('session_id')) {",
+					"    pm.collectionVariables.set('session_id', 'postman_' + Math.random().toString(36).substr(2, 9));",
+					"}"
 				]
 			}
 		},
@@ -635,21 +873,51 @@
 			"script": {
 				"type": "text/javascript",
 				"exec": [
-					""
+					"// Tests communs de validation",
+					"pm.test('Response time is acceptable', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(2000);",
+					"});",
+					"",
+					"// Vérifier headers Kong",
+					"if (pm.response.headers.get('X-Kong-Proxy-Latency')) {",
+					"    pm.test('Kong Gateway headers present', function () {",
+					"        pm.expect(pm.response.headers.get('X-Kong-Proxy-Latency')).to.exist;",
+					"    });",
+					"}"
 				]
 			}
 		}
 	],
 	"variable": [
 		{
-			"key": "base_url",
-			"value": "http://localhost:8000",
-			"type": "string"
+			"key": "gateway_url",
+			"value": "http://localhost:8080",
+			"type": "string",
+			"description": "Kong API Gateway URL"
 		},
 		{
-			"key": "api_token",
-			"value": "pos-api-token-2025",
-			"type": "string"
+			"key": "kong_admin_url",
+			"value": "http://localhost:8001",
+			"type": "string",
+			"description": "Kong Admin API URL"
+		},
+		{
+			"key": "gateway_api_key",
+			"value": "pos-microservices-2025",
+			"type": "string",
+			"description": "Clé API pour Kong Gateway"
+		},
+		{
+			"key": "jwt_token",
+			"value": "",
+			"type": "string",
+			"description": "Token JWT pour Customer Service"
+		},
+		{
+			"key": "session_id",
+			"value": "",
+			"type": "string",
+			"description": "Session ID pour Cart Service"
 		},
 		{
 			"key": "product_id",
@@ -660,6 +928,18 @@
 			"key": "report_id",
 			"value": "1",
 			"type": "string"
+		},
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string",
+			"description": "DEPRECATED - Ancienne API monolithique"
+		},
+		{
+			"key": "api_token",
+			"value": "pos-api-token-2025",
+			"type": "string",
+			"description": "DEPRECATED - Ancien token monolithique"
 		}
 	]
 } 
