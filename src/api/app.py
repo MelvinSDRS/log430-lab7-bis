@@ -132,6 +132,19 @@ def configure_api_logging(app):
         app.logger.info('Démarrage de l\'API POS Multi-Magasins')
 
 
+def create_app(config_name=None):
+    """Factory pour créer l'application Flask - Compatible avec les tests"""
+    app = create_api_app()
+    
+    # Configuration spécifique selon l'environnement
+    if config_name == "testing":
+        app.config['TESTING'] = True
+        app.config['WTF_CSRF_ENABLED'] = False
+        app.config['SECRET_KEY'] = 'test-secret-key'
+    
+    return app
+
+
 api_app = create_api_app()
 
 
