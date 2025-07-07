@@ -10,10 +10,10 @@ import json
 from typing import Optional, Dict, Any
 
 # Configuration Redis
-REDIS_URL = os.getenv('REDIS_URL', 'redis://:cart-redis-secret-2025@cart-cache:6379/0')
+REDIS_URL = os.getenv('REDIS_URL', 'redis://:cart-cache-secret-2025@cart-cache:6379/0')
 REDIS_HOST = os.getenv('REDIS_HOST', 'cart-cache')
 REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
-REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', None)
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'cart-cache-secret-2025')
 REDIS_DB = int(os.getenv('REDIS_DB', '0'))
 
 # Configuration connexions

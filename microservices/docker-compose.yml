@@ -356,7 +356,7 @@ services:
     build: ./cart-service
     container_name: pos-cart-service-legacy
     environment:
-      - REDIS_URL=redis://cart-cache:6379/0
+      - REDIS_URL=redis://:cart-cache-secret-2025@cart-cache:6379/0
       - FLASK_ENV=development
       - INSTANCE_ID=cart-legacy
       - SERVICE_NAME=cart-service-legacy
@@ -411,6 +411,58 @@ services:
       timeout: 10s
       retries: 3
 
+  # Saga Orchestrator Service
+  saga-orchestrator:
+    build:
+      context: ./saga-orchestrator
+      dockerfile: Dockerfile
+    container_name: pos-saga-orchestrator
+    environment:
+      - SECRET_KEY=saga-orchestrator-secret-2025
+      - DEBUG=False
+      - GATEWAY_URL=http://api-gateway:8000
+    ports:
+      - "8008:8008"
+    depends_on:
+      inventory-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      cart-service-1:
+        condition: service_started
+      order-service:
+        condition: service_started
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Payment Service
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: pos-payment-service
+    environment:
+      - SECRET_KEY=payment-service-secret-2025
+      - DEBUG=False
+      - SIMULATE_FAILURES=false
+      - FAILURE_RATE=0.1
+    ports:
+      - "8009:8009"
+    networks:
+      - microservices-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # API Gateway (Kong Community)
   api-gateway:
     image: kong:latest
@@ -443,6 +495,8 @@ services:
       - cart-service-2
       - cart-service-3
       - order-service
+      - saga-orchestrator
+      - payment-service
     networks:
       - microservices-network
     restart: unless-stopped

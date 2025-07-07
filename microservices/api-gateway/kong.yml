@@ -30,6 +30,14 @@ services:
   - name: order-service
     url: http://order-service:8007
     tags: ["microservices", "order"]
+    
+  - name: saga-orchestrator
+    url: http://saga-orchestrator:8008
+    tags: ["microservices", "saga", "orchestration"]
+    
+  - name: payment-service
+    url: http://payment-service:8009
+    tags: ["microservices", "payment"]
 
 upstreams:
   - name: cart-upstream
@@ -147,6 +155,24 @@ routes:
     methods: ["POST"]
     strip_path: false
 
+  - name: saga-orchestrator-api
+    service: saga-orchestrator
+    paths: ["/api/v1/sagas"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    strip_path: false
+
+  - name: saga-test-api
+    service: saga-orchestrator
+    paths: ["/api/v1/test"]
+    methods: ["GET", "POST"]
+    strip_path: false
+
+  - name: payment-api
+    service: payment-service
+    paths: ["/api/v1/payment"]
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    strip_path: false
+
 consumers:
   - username: pos-api-client
     custom_id: "external-client"
@@ -173,7 +199,7 @@ consumers:
       - key: "pos-test-automation-dev-key-2025"
 
 plugins:
-  # Plugins globaux - Fonctionnalités Étape 2
+  # Plugins globaux
   - name: cors
     config:
       origins: ["http://localhost:3000", "http://localhost:3001", "http://localhost:5000"]
@@ -273,7 +299,25 @@ plugins:
       key_names: ["X-API-Key"]
       key_in_header: true
 
-  # Plugin Load Balancing monitoring - Étape 3
+  - name: key-auth
+    route: saga-orchestrator-api
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+
+  - name: key-auth
+    route: saga-test-api
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+
+  - name: key-auth
+    route: payment-api
+    config:
+      key_names: ["X-API-Key"]
+      key_in_header: true
+
+  # Plugin Load Balancing monitoring
   - name: request-transformer
     route: cart-api-loadbalanced
     config:

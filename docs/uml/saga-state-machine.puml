@@ -1,0 +1,57 @@
+@startuml saga-state-machine
+
+!theme plain
+
+title Machine d'Etat Saga
+
+skinparam state {
+  BackgroundColor lightblue
+  BorderColor black
+  StartColor green
+  EndColor red
+}
+
+[*] --> PENDING : Creation saga
+
+PENDING --> CART_VALIDATED : validate_cart()
+CART_VALIDATED --> STOCK_RESERVED : reserve_stock()
+STOCK_RESERVED --> PAYMENT_PROCESSED : process_payment()
+PAYMENT_PROCESSED --> ORDER_CONFIRMED : confirm_order()
+ORDER_CONFIRMED --> COMPLETED : finalize()
+
+PENDING --> CART_VALIDATION_FAILED : Panier invalide
+CART_VALIDATED --> STOCK_RESERVATION_FAILED : Stock insuffisant
+STOCK_RESERVED --> PAYMENT_FAILED : Paiement refuse
+PAYMENT_PROCESSED --> ORDER_CONFIRMATION_FAILED : Service order indisponible
+
+STOCK_RESERVATION_FAILED --> COMPENSATING_STOCK : Liberer reservations
+PAYMENT_FAILED --> COMPENSATING_STOCK : Liberer stock
+PAYMENT_FAILED --> COMPENSATING_PAYMENT : Annuler paiement
+ORDER_CONFIRMATION_FAILED --> COMPENSATING_PAYMENT : Rembourser
+ORDER_CONFIRMATION_FAILED --> COMPENSATING_STOCK : Liberer stock
+
+COMPENSATING_STOCK --> COMPENSATED : Actions compensation OK
+COMPENSATING_PAYMENT --> COMPENSATED : Actions compensation OK
+
+CART_VALIDATION_FAILED --> FAILED : Echec definitif
+COMPENSATED --> FAILED : Compensation terminee
+COMPLETED --> [*] : Saga reussie
+FAILED --> [*] : Saga echouee
+
+note right of PENDING : Donnees initiales\nsession_id, customer_id\nshipping_address, payment_info
+
+note right of CART_VALIDATED : Validation panier\nVerifier items, calculer totaux\nvalider adresses
+
+note right of STOCK_RESERVED : Reservation stock\nVerifier disponibilite\nreservation temporaire 10min
+
+note right of PAYMENT_PROCESSED : Traitement paiement\nAutoriser carte, capturer montant\ngenerer transaction_id
+
+note right of ORDER_CONFIRMED : Confirmation commande\nCreer order_id, notifier client\nmise a jour inventaire
+
+note left of COMPENSATING_STOCK : Compensation stock\nLiberer reservations\nremettre en disponible
+
+note left of COMPENSATING_PAYMENT : Compensation paiement\nAnnuler transaction\nrembourser client
+
+note bottom : Metriques Prometheus\nsaga_requests_total, saga_duration_seconds\nsaga_errors_total, compensation_total
+
+@enduml
