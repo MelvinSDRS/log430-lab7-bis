@@ -1,5 +1,5 @@
 @startuml
-package "Architecture Microservices Lab 5" {
+package "Architecture Distribuée Lab 7 - Saga Orchestration + Event-Driven" {
 
   ' API Gateway Layer
   package "API Gateway Layer" {
@@ -55,6 +55,44 @@ package "Architecture Microservices Lab 5" {
       [Order Processing] as ORDER_DOMAIN
       [Order Repository] as ORDER_REPO
     }
+    
+    package "Saga Orchestration Context" {
+      [Saga Orchestrator] as SAGA_ORCHESTRATOR
+      [Saga State Machine] as SAGA_STATE
+      [Compensation Engine] as COMPENSATION_ENGINE
+    }
+    
+    package "Payment Bounded Context" {
+      [Payment Service] as PAYMENT_SVC
+      [Payment Processing] as PAYMENT_DOMAIN
+      [Payment Gateway] as PAYMENT_GATEWAY
+    }
+  }
+  
+  ' Lab 7 Event-Driven Layer
+  package "Event-Driven Architecture (Lab 7)" {
+    
+    package "Event Infrastructure" {
+      [Redis Streams] as REDIS_STREAMS
+      [Event Bus] as EVENT_BUS_LAB7
+    }
+    
+    package "Claims Bounded Context" {
+      [Claims Service] as CLAIMS_SVC
+      [Claims Domain Logic] as CLAIMS_DOMAIN
+      [Event Publisher] as EVENT_PUBLISHER
+    }
+    
+    package "Event Consumers" {
+      [Notification Service] as NOTIFICATION_SVC
+      [Audit Service] as AUDIT_SVC
+      [Integration Service] as INTEGRATION_SVC
+    }
+    
+    package "CQRS Read Side" {
+      [Query Service] as QUERY_SVC
+      [Projection Service] as PROJECTION_SVC
+    }
   }
   
   ' Data Layer
@@ -66,6 +104,11 @@ package "Architecture Microservices Lab 5" {
     database "Customer DB\n(PostgreSQL)" as CUSTOMER_DB
     database "Cart Cache\n(Redis)" as CART_CACHE
     database "Order DB\n(PostgreSQL)" as ORDER_DB
+    database "Payment DB\n(PostgreSQL)" as PAYMENT_DB
+    database "Saga State\n(In-Memory)" as SAGA_STATE_DB
+    database "Event Store\n(MongoDB)" as EVENT_STORE_DB
+    database "Read Models\n(PostgreSQL)" as READ_MODELS_DB
+    database "Event Streams\n(Redis)" as EVENT_STREAMS_DB
   }
   
   ' Cross-cutting Concerns
@@ -109,6 +152,8 @@ KONG --> REPORTING_SVC : "Reporting APIs"
 KONG --> CUSTOMER_SVC : "Customer APIs"
 KONG --> CART_CLUSTER : "Cart APIs (Load Balanced)"
 KONG --> ORDER_SVC : "Order APIs"
+KONG --> SAGA_ORCHESTRATOR : "Saga APIs"
+KONG --> PAYMENT_SVC : "Payment APIs"
 
 ' Service internal structure
 PRODUCT_SVC *-- PRODUCT_DOMAIN
@@ -125,6 +170,10 @@ CART_CLUSTER *-- CART_DOMAIN
 CART_DOMAIN --> CART_CACHE_LAYER
 ORDER_SVC *-- ORDER_DOMAIN
 ORDER_DOMAIN --> ORDER_REPO
+SAGA_ORCHESTRATOR *-- SAGA_STATE
+SAGA_ORCHESTRATOR *-- COMPENSATION_ENGINE
+PAYMENT_SVC *-- PAYMENT_DOMAIN
+PAYMENT_DOMAIN --> PAYMENT_GATEWAY
 
 ' Repository to Database connections
 PRODUCT_REPO --> PRODUCT_DB
@@ -134,6 +183,23 @@ REPORTING_REPO --> REPORTING_DB
 CUSTOMER_REPO --> CUSTOMER_DB
 CART_CACHE_LAYER --> CART_CACHE
 ORDER_REPO --> ORDER_DB
+PAYMENT_GATEWAY --> PAYMENT_DB
+SAGA_STATE --> SAGA_STATE_DB
+
+' Lab 7 Event-Driven connections
+CLAIMS_SVC *-- CLAIMS_DOMAIN
+CLAIMS_DOMAIN --> EVENT_PUBLISHER
+EVENT_PUBLISHER --> REDIS_STREAMS
+EVENT_PUBLISHER --> EVENT_STORE_DB
+REDIS_STREAMS --> EVENT_STREAMS_DB
+REDIS_STREAMS --> NOTIFICATION_SVC
+REDIS_STREAMS --> AUDIT_SVC
+PROJECTION_SVC --> READ_MODELS_DB
+QUERY_SVC --> READ_MODELS_DB
+
+' Lab 6 <-> Lab 7 Integration
+INTEGRATION_SVC ..> ORDER_SVC : "Fetch order context"
+INTEGRATION_SVC ..> CUSTOMER_SVC : "Fetch customer context"
 
 ' Inter-service communication
 SALES_SVC ..> INVENTORY_SVC : "Stock validation"
@@ -143,6 +209,13 @@ REPORTING_SVC ..> INVENTORY_SVC : "Stock metrics"
 ORDER_SVC ..> CART_CLUSTER : "Cart checkout"
 ORDER_SVC ..> INVENTORY_SVC : "Stock reservation"
 ORDER_SVC ..> CUSTOMER_SVC : "Customer validation"
+
+' Saga Orchestration communication
+SAGA_ORCHESTRATOR ..> CART_CLUSTER : "Cart validation"
+SAGA_ORCHESTRATOR ..> INVENTORY_SVC : "Stock reservation"
+SAGA_ORCHESTRATOR ..> PAYMENT_SVC : "Payment processing"
+SAGA_ORCHESTRATOR ..> ORDER_SVC : "Order confirmation"
+SAGA_ORCHESTRATOR ..> PROMETHEUS : "Saga metrics"
 
 ' Cross-cutting concerns
 PRODUCT_SVC --> EVENT_BUS
@@ -157,6 +230,11 @@ REPORTING_SVC --> METRICS
 CUSTOMER_SVC --> METRICS
 CART_CLUSTER --> METRICS
 ORDER_SVC --> METRICS
+SAGA_ORCHESTRATOR --> METRICS
+PAYMENT_SVC --> METRICS
+CLAIMS_SVC --> METRICS
+NOTIFICATION_SVC --> METRICS
+AUDIT_SVC --> METRICS
 
 ' Monitoring connections
 METRICS --> PROMETHEUS
@@ -181,12 +259,23 @@ note top of KONG
 end note
 
 note right of "Microservices Business Layer"
-  Domain-Driven Design:
+  Domain-Driven Design + Saga Pattern:
   - Each service owns its bounded context
   - Database per service pattern
-  - Event-driven communication
-  - Service autonomy and independence
+  - Saga orchestration for distributed transactions
+  - Compensation actions for failure recovery
+  - Service autonomy with coordinated consistency
   - Clear business domain separation
+end note
+
+note right of "Saga Orchestration Context"
+  Saga Orchestrator Features:
+  - Synchronous orchestration pattern
+  - State machine-based coordination
+  - Automatic compensation on failures
+  - Prometheus metrics integration
+  - Timeout and retry mechanisms
+  - In-memory state management
 end note
 
 note bottom of CART_CLUSTER
@@ -196,6 +285,16 @@ note bottom of CART_CLUSTER
   - Kong upstream configuration
   - Health check monitoring
   - Automatic failover
+end note
+
+note right of "Event-Driven Architecture (Lab 7)"
+  Event Sourcing + CQRS Pattern:
+  - Event-driven claims management
+  - Redis Streams for Pub/Sub messaging
+  - MongoDB Event Store for persistence
+  - CQRS with separate read/write models
+  - Integration bridge with Lab 6
+  - Decoupled event consumers
 end note
 
 @enduml

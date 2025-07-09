@@ -32,6 +32,14 @@ ORDER_CONFIRMATION_FAILED --> COMPENSATING_STOCK : Liberer stock
 
 COMPENSATING_STOCK --> COMPENSATED : Actions compensation OK
 COMPENSATING_PAYMENT --> COMPENSATED : Actions compensation OK
+COMPENSATING_PAYMENT --> COMPENSATING_STOCK : Compensation suivante
+
+state "Timeout/Error States" as TIMEOUT_STATES {
+  CART_VALIDATION_TIMEOUT --> FAILED : Timeout validation panier
+  STOCK_RESERVATION_TIMEOUT --> COMPENSATING_STOCK : Timeout reservation
+  PAYMENT_TIMEOUT --> COMPENSATING_STOCK : Timeout paiement
+  ORDER_CONFIRMATION_TIMEOUT --> COMPENSATING_PAYMENT : Timeout confirmation
+}
 
 CART_VALIDATION_FAILED --> FAILED : Echec definitif
 COMPENSATED --> FAILED : Compensation terminee
@@ -52,6 +60,6 @@ note left of COMPENSATING_STOCK : Compensation stock\nLiberer reservations\nreme
 
 note left of COMPENSATING_PAYMENT : Compensation paiement\nAnnuler transaction\nrembourser client
 
-note bottom : Metriques Prometheus\nsaga_requests_total, saga_duration_seconds\nsaga_errors_total, compensation_total
+note bottom : Metriques Prometheus\nsaga_requests_total{status=COMPLETED|FAILED}\nsaga_duration_seconds (histogramme)\nsaga_steps_total{step_type, status}\ncompensation_actions_total{action_type}\nsaga_timeouts_total{timeout_type}
 
 @enduml

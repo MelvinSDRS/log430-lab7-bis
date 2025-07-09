@@ -1,0 +1,133 @@
+@startuml
+title Claims Management - Event-Driven Architecture (Lab 7)
+
+actor "Customer" as CUSTOMER
+participant "Claims Service" as CLAIMS_SVC
+participant "Event Publisher" as EVENT_PUB
+participant "Redis Streams" as REDIS_STREAMS
+participant "MongoDB\nEvent Store" as EVENT_STORE
+participant "Notification Service" as NOTIFICATION_SVC
+participant "Audit Service" as AUDIT_SVC
+participant "Integration Service" as INTEGRATION_SVC
+participant "Lab 6 Order Service" as ORDER_SVC
+database "PostgreSQL\nRead Models" as READ_MODELS
+
+' 1. Create Claim
+CUSTOMER -> CLAIMS_SVC : POST /claims\n{customer_id, claim_type, description}
+activate CLAIMS_SVC
+
+CLAIMS_SVC -> CLAIMS_SVC : validate(claim_data)
+CLAIMS_SVC -> CLAIMS_SVC : generate_claim_id()
+
+' 2. Publish ReclamationCreee Event
+CLAIMS_SVC -> EVENT_PUB : publish_event("ReclamationCreee", claim_data)
+activate EVENT_PUB
+
+' 3. Persist Event (Event Sourcing)
+EVENT_PUB -> EVENT_STORE : store_event(ReclamationCreee)
+activate EVENT_STORE
+EVENT_STORE --> EVENT_PUB : event_stored
+deactivate EVENT_STORE
+
+' 4. Publish to Event Streams (Pub/Sub)
+EVENT_PUB -> REDIS_STREAMS : XADD events:reclamationcreee
+EVENT_PUB -> REDIS_STREAMS : XADD events:all
+activate REDIS_STREAMS
+REDIS_STREAMS --> EVENT_PUB : event_published
+deactivate REDIS_STREAMS
+deactivate EVENT_PUB
+
+CLAIMS_SVC --> CUSTOMER : 201 Created\n{claim_id, status: "created"}
+deactivate CLAIMS_SVC
+
+' 5. Event Consumers Process Events (Asynchronous)
+group Parallel Event Processing
+    REDIS_STREAMS -> NOTIFICATION_SVC : consume_event(ReclamationCreee)
+    activate NOTIFICATION_SVC
+    NOTIFICATION_SVC -> NOTIFICATION_SVC : send_confirmation_email()
+    NOTIFICATION_SVC -> NOTIFICATION_SVC : send_sms_notification()
+    deactivate NOTIFICATION_SVC
+    
+    REDIS_STREAMS -> AUDIT_SVC : consume_event(ReclamationCreee)
+    activate AUDIT_SVC
+    AUDIT_SVC -> AUDIT_SVC : create_audit_entry()
+    AUDIT_SVC -> READ_MODELS : store_audit_record
+    deactivate AUDIT_SVC
+    
+    REDIS_STREAMS -> INTEGRATION_SVC : consume_event(ReclamationCreee)
+    activate INTEGRATION_SVC
+    INTEGRATION_SVC -> ORDER_SVC : fetch_order_context(customer_id)
+    activate ORDER_SVC
+    ORDER_SVC --> INTEGRATION_SVC : order_details
+    deactivate ORDER_SVC
+    INTEGRATION_SVC -> INTEGRATION_SVC : enrich_claim_context()
+    deactivate INTEGRATION_SVC
+end
+
+note right of REDIS_STREAMS
+  Event Bus Features:
+  - At-least-once delivery
+  - Consumer groups
+  - Event ordering
+  - Backpressure handling
+end note
+
+' 6. Assign Claim to Agent
+CUSTOMER -> CLAIMS_SVC : POST /claims/{id}\n{agent_id}
+activate CLAIMS_SVC
+
+CLAIMS_SVC -> CLAIMS_SVC : assign_to_agent(agent_id)
+
+' 7. Publish ReclamationAffectee Event
+CLAIMS_SVC -> EVENT_PUB : publish_event("ReclamationAffectee", assignment_data)
+activate EVENT_PUB
+EVENT_PUB -> EVENT_STORE : store_event(ReclamationAffectee)
+EVENT_PUB -> REDIS_STREAMS : XADD events:reclamationaffectee
+EVENT_PUB -> REDIS_STREAMS : XADD events:all
+deactivate EVENT_PUB
+
+CLAIMS_SVC --> CUSTOMER : 200 OK\n{status: "assigned"}
+deactivate CLAIMS_SVC
+
+' 8. More Event Processing
+group Parallel Event Processing
+    REDIS_STREAMS -> NOTIFICATION_SVC : consume_event(ReclamationAffectee)
+    activate NOTIFICATION_SVC
+    NOTIFICATION_SVC -> NOTIFICATION_SVC : notify_agent_assignment()
+    NOTIFICATION_SVC -> NOTIFICATION_SVC : notify_customer_assignment()
+    deactivate NOTIFICATION_SVC
+    
+    REDIS_STREAMS -> AUDIT_SVC : consume_event(ReclamationAffectee)
+    activate AUDIT_SVC
+    AUDIT_SVC -> AUDIT_SVC : audit_status_change()
+    deactivate AUDIT_SVC
+end
+
+' 9. Complete Claim Lifecycle (Fast Forward)
+note over CUSTOMER, READ_MODELS
+  Similar event flows for:
+  - ReclamationEnCours (start processing)
+  - ReclamationResolue (resolution provided)
+  - ReclamationCloturee (case closed)
+  
+  Each event triggers independent processing
+  by all subscribers with fault isolation.
+end note
+
+note left of EVENT_STORE
+  Event Sourcing Benefits:
+  - Immutable event history
+  - Replay capability
+  - Audit trail automatically
+  - State reconstruction
+end note
+
+note right of NOTIFICATION_SVC
+  Decoupled Consumers:
+  - Independent scaling
+  - Fault isolation
+  - Easy to add new consumers
+  - Eventual consistency
+end note
+
+@enduml

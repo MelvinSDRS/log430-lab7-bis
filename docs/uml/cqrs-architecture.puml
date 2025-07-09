@@ -1,0 +1,50 @@
+@startuml cqrs-architecture
+!define COMMAND_COLOR #E8F4FD
+!define EVENT_COLOR #FFF2CC
+!define QUERY_COLOR #E1F5FE
+
+title Architecture CQRS avec Event Broker
+
+package "Command Side" COMMAND_COLOR {
+  [Claims Service\n(Port 8101)] as ClaimsService
+  database "État Mémoire" as Memory {
+    [6 Réclamations] as Claims
+  }
+  
+  ClaimsService --> Claims : CRUD\nBusiness Logic
+}
+
+package "Event Broker" EVENT_COLOR {
+  [Redis Streams] as Redis
+  [events:all] as Stream
+  
+  Redis --> Stream : Pub/Sub
+}
+
+package "Query Side" QUERY_COLOR {
+  [Projection Service\n(Port 8104)] as ProjectionService
+  [Query Service\n(Port 8105)] as QueryService
+  
+  database "PostgreSQL" as PostgreSQL {
+    [ClaimReadModel] as CRM
+    [CustomerStats] as CS
+    [AgentStats] as AS
+    [TypeStats] as TS
+  }
+  
+  QueryService --> PostgreSQL : Read Only
+  ProjectionService --> PostgreSQL : Update
+}
+
+' Flux principal CQRS
+ClaimsService --> Redis : Publish Events\n(async)
+Redis --> ProjectionService : Consume Events\n(Consumer Group)
+ProjectionService --> QueryService : Sync Read Models
+
+' Annotations
+note right of ClaimsService : Commandes métier\nÉcriture optimisée
+note left of QueryService : Lectures optimisées\nAPIs spécialisées
+note top of Redis : Synchronisation\nasynchrone
+note bottom of PostgreSQL : 3 Read Models\nvs 6 Commands
+
+@enduml

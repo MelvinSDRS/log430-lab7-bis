@@ -1,0 +1,297 @@
+services:
+  # Redis Streams pour la messagerie événementielle
+  redis-streams:
+    image: redis:7-alpine
+    container_name: lab7-redis-streams
+    environment:
+      - REDIS_PASSWORD=event-streams-secret-2025
+    volumes:
+      - redis_streams_data:/data
+    command: |
+      redis-server 
+      --requirepass event-streams-secret-2025
+      --appendonly yes 
+      --maxmemory 1gb 
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 300
+      --timeout 0
+    ports:
+      - "6381:6379"
+    networks:
+      - event-driven-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "event-streams-secret-2025", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Event Store (MongoDB pour persistance des événements)
+  event-store:
+    image: mongo:7
+    container_name: lab7-event-store
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=event_admin
+      - MONGO_INITDB_ROOT_PASSWORD=event_store_password_2025
+      - MONGO_INITDB_DATABASE=event_store
+    volumes:
+      - event_store_data:/data/db
+    ports:
+      - "27018:27017"
+    networks:
+      - event-driven-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Base de données PostgreSQL pour Read Models (CQRS)
+  read-models-db:
+    image: postgres:15
+    container_name: lab7-read-models-db
+    environment:
+      POSTGRES_DB: read_models_db
+      POSTGRES_USER: read_models_user
+      POSTGRES_PASSWORD: read_models_password_2025
+    ports:
+      - "5439:5432"
+    volumes:
+      - read_models_data:/var/lib/postgresql/data
+    networks:
+      - event-driven-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U read_models_user -d read_models_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Service de gestion des réclamations (Producteur d'événements)
+  claims-service:
+    build:
+      context: ./claims-service
+      dockerfile: Dockerfile
+    container_name: lab7-claims-service
+    environment:
+      - REDIS_URL=redis://:event-streams-secret-2025@redis-streams:6379/0
+      - MONGO_URL=mongodb://event_admin:event_store_password_2025@event-store:27017/event_store?authSource=admin
+      - SECRET_KEY=claims-service-secret-2025
+      - DEBUG=False
+    ports:
+      - "8101:8101"
+    depends_on:
+      redis-streams:
+        condition: service_healthy
+      event-store:
+        condition: service_healthy
+    networks:
+      - event-driven-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8101/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service de notifications (Abonné aux événements)
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: lab7-notification-service
+    environment:
+      - REDIS_URL=redis://:event-streams-secret-2025@redis-streams:6379/0
+      - MONGO_URL=mongodb://event_admin:event_store_password_2025@event-store:27017/event_store?authSource=admin
+      - SECRET_KEY=notification-service-secret-2025
+      - DEBUG=False
+    ports:
+      - "8102:8102"
+    depends_on:
+      redis-streams:
+        condition: service_healthy
+      event-store:
+        condition: service_healthy
+    networks:
+      - event-driven-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8102/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service d'audit (Abonné aux événements)
+  audit-service:
+    build:
+      context: ./audit-service
+      dockerfile: Dockerfile
+    container_name: lab7-audit-service
+    environment:
+      - REDIS_URL=redis://:event-streams-secret-2025@redis-streams:6379/0
+      - MONGO_URL=mongodb://event_admin:event_store_password_2025@event-store:27017/event_store?authSource=admin
+      - SECRET_KEY=audit-service-secret-2025
+      - DEBUG=False
+    ports:
+      - "8103:8103"
+    depends_on:
+      redis-streams:
+        condition: service_healthy
+      event-store:
+        condition: service_healthy
+    networks:
+      - event-driven-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8103/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service de projections pour CQRS (Read Models)
+  projection-service:
+    build:
+      context: ./projection-service
+      dockerfile: Dockerfile
+    container_name: lab7-projection-service
+    environment:
+      - REDIS_URL=redis://:event-streams-secret-2025@redis-streams:6379/0
+      - MONGO_URL=mongodb://event_admin:event_store_password_2025@event-store:27017/event_store?authSource=admin
+      - POSTGRES_URL=postgresql://read_models_user:read_models_password_2025@read-models-db:5432/read_models_db
+      - SECRET_KEY=projection-service-secret-2025
+      - DEBUG=False
+    ports:
+      - "8104:8104"
+    depends_on:
+      redis-streams:
+        condition: service_healthy
+      event-store:
+        condition: service_healthy
+      read-models-db:
+        condition: service_healthy
+    networks:
+      - event-driven-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8104/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service de requêtes CQRS (Query Side)
+  query-service:
+    build:
+      context: ./query-service
+      dockerfile: Dockerfile
+    container_name: lab7-query-service
+    environment:
+      - POSTGRES_URL=postgresql://read_models_user:read_models_password_2025@read-models-db:5432/read_models_db
+      - SECRET_KEY=query-service-secret-2025
+      - DEBUG=False
+    ports:
+      - "8105:8105"
+    depends_on:
+      read-models-db:
+        condition: service_healthy
+    networks:
+      - event-driven-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8105/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service de gestion d'Event Store (Replay, etc.)
+  event-store-service:
+    build:
+      context: ./event-store-service
+      dockerfile: Dockerfile
+    container_name: lab7-event-store-service
+    environment:
+      - MONGO_URL=mongodb://event_admin:event_store_password_2025@event-store:27017/event_store?authSource=admin
+      - SECRET_KEY=event-store-service-secret-2025
+      - DEBUG=False
+    ports:
+      - "8106:8106"
+    depends_on:
+      event-store:
+        condition: service_healthy
+    networks:
+      - event-driven-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8106/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service d'intégration Lab 6 <-> Lab 7
+  integration-service:
+    build:
+      context: ./integration-service
+      dockerfile: Dockerfile
+    container_name: lab7-integration-service
+    environment:
+      - LAB6_ORDER_SERVICE=http://host.docker.internal:8007
+      - LAB6_CUSTOMER_SERVICE=http://host.docker.internal:8005
+      - LAB7_CLAIMS_SERVICE=http://claims-service:8101
+      - SECRET_KEY=integration-service-secret-2025
+      - DEBUG=False
+    ports:
+      - "8107:8107"
+    networks:
+      - event-driven-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8107/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Prometheus pour métriques
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lab7-prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"
+    networks:
+      - event-driven-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # Grafana pour dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: lab7-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - event-driven-network
+    restart: unless-stopped
+
+volumes:
+  redis_streams_data:
+  event_store_data:
+  read_models_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  event-driven-network:
+    driver: bridge
+    name: event-driven-network

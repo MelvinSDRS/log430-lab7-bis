@@ -1,5 +1,5 @@
 @startuml
-title Architecture Microservices - Lab 5 Système POS + E-commerce
+title Architecture Distribuée Lab 6 & 7 - Saga Orchestration + Event-Driven
 
 ' API Gateway Kong - Point d'entrée unique
 node "Kong API Gateway :8080" {
@@ -57,6 +57,17 @@ package "Microservices Layer" {
     component "Order API" as ORDER_API
     database "PostgreSQL\norder_db" as ORDER_DB
   }
+  
+  node "Saga Orchestrator :8008" {
+    component "Saga Orchestrator API" as SAGA_API
+    component "State Machine" as SAGA_STATE_MACHINE
+    component "Compensation Engine" as COMPENSATION_ENGINE
+  }
+  
+  node "Payment Service :8009" {
+    component "Payment API" as PAYMENT_API
+    database "PostgreSQL\npayment_db" as PAYMENT_DB
+  }
 }
 
 ' Monitoring & Observability
@@ -67,6 +78,37 @@ package "Observability Stack" {
   
   node "Prometheus :9090" {
     component "Metrics Collection" as PROMETHEUS
+  }
+}
+
+' Lab 7 Event-Driven Architecture
+package "Event-Driven Layer (Lab 7)" {
+  
+  node "Claims Service :8101" {
+    component "Claims API" as CLAIMS_API
+  }
+  
+  node "Notification Service :8102" {
+    component "Notification Consumer" as NOTIFICATION_CONSUMER
+  }
+  
+  node "Audit Service :8103" {
+    component "Audit Consumer" as AUDIT_CONSUMER
+  }
+  
+  node "Integration Service :8107" {
+    component "Integration Bridge" as INTEGRATION_BRIDGE
+  }
+  
+  node "Event Infrastructure" {
+    database "Redis Streams\n:6381" as REDIS_STREAMS
+    database "MongoDB\nEvent Store :27018" as EVENT_STORE
+    database "PostgreSQL\nRead Models :5439" as READ_MODELS
+  }
+  
+  node "Event Monitoring :9091" {
+    component "Prometheus Events" as PROMETHEUS_EVENTS
+    component "Grafana Lab 7 :3001" as GRAFANA_LAB7
   }
 }
 
@@ -88,6 +130,8 @@ KONG --> CART_API_1 : "/api/v1/cart"
 KONG --> CART_API_2 : "/api/v1/cart"
 KONG --> CART_API_3 : "/api/v1/cart"
 KONG --> ORDER_API : "/api/v1/orders"
+KONG --> SAGA_API : "/api/v1/sagas"
+KONG --> PAYMENT_API : "/api/v1/payment"
 
 ' Database connections
 PRODUCT_API --> PRODUCT_DB
@@ -99,6 +143,9 @@ CART_API_1 --> CART_CACHE
 CART_API_2 --> CART_CACHE
 CART_API_3 --> CART_CACHE
 ORDER_API --> ORDER_DB
+PAYMENT_API --> PAYMENT_DB
+SAGA_API *-- SAGA_STATE_MACHINE
+SAGA_API *-- COMPENSATION_ENGINE
 
 ' Inter-service communication
 SALES_API ..> INVENTORY_API : "Stock validation"
@@ -108,6 +155,20 @@ REPORTING_API ..> INVENTORY_API : "Stock data"
 ORDER_API ..> CART_API_1 : "Cart checkout"
 ORDER_API ..> INVENTORY_API : "Stock reservation"
 ORDER_API ..> CUSTOMER_API : "Customer validation"
+
+' Saga Orchestration communication
+SAGA_API ..> CART_API_1 : "Cart validation"
+SAGA_API ..> INVENTORY_API : "Stock reservation"
+SAGA_API ..> PAYMENT_API : "Payment processing"
+SAGA_API ..> ORDER_API : "Order confirmation"
+
+' Lab 7 Event-Driven communication
+CLAIMS_API --> REDIS_STREAMS : "Publish events"
+CLAIMS_API --> EVENT_STORE : "Store events"
+REDIS_STREAMS --> NOTIFICATION_CONSUMER : "Event stream"
+REDIS_STREAMS --> AUDIT_CONSUMER : "Event stream"
+INTEGRATION_BRIDGE ..> ORDER_API : "Fetch order context"
+INTEGRATION_BRIDGE ..> CUSTOMER_API : "Fetch customer context"
 
 ' Client connections
 WEB_CLIENT --> KONG : "HTTPS"
@@ -123,7 +184,13 @@ REPORTING_API ..> PROMETHEUS : "metrics"
 CUSTOMER_API ..> PROMETHEUS : "metrics"
 CART_API_1 ..> PROMETHEUS : "metrics"
 ORDER_API ..> PROMETHEUS : "metrics"
+SAGA_API ..> PROMETHEUS : "saga metrics"
+PAYMENT_API ..> PROMETHEUS : "payment metrics"
+CLAIMS_API ..> PROMETHEUS_EVENTS : "event metrics"
+NOTIFICATION_CONSUMER ..> PROMETHEUS_EVENTS : "notification metrics"
+AUDIT_CONSUMER ..> PROMETHEUS_EVENTS : "audit metrics"
 PROMETHEUS --> GRAFANA : "visualization"
+PROMETHEUS_EVENTS --> GRAFANA_LAB7 : "event visualization"
 
 note bottom of KONG
   Kong Gateway Features:
@@ -135,7 +202,7 @@ note bottom of KONG
   - Health Checks & Circuit Breaker
 end note
 
-note bottom of "Cart Service Cluster"
+note bottom of "Cart Service Cluster (Load Balanced)"
   Load Balancing Strategy:
   - Algorithm: least-connections
   - Health Checks: /health every 15s
@@ -145,10 +212,31 @@ end note
 
 note bottom of "Microservices Layer"
   Database per Service Pattern:
-  - 7 PostgreSQL databases (isolated)
+  - 9 PostgreSQL databases (isolated)
   - 1 Redis cache (shared by Cart instances)
+  - In-memory saga state management
   - No direct database access between services
-  - Event-driven communication for consistency
+  - Saga orchestration for distributed transactions
+end note
+
+note right of "Saga Orchestrator :8008"
+  Saga Orchestrator Features:
+  - Synchronous orchestration pattern
+  - State machine coordination
+  - Automatic compensation on failures
+  - Prometheus metrics integration
+  - Timeout and retry mechanisms
+  - In-memory state persistence
+end note
+
+note left of "Event-Driven Layer (Lab 7)"
+  Event-Driven Architecture Features:
+  - Event Sourcing with MongoDB persistence
+  - CQRS with separate read/write models
+  - Redis Streams for Pub/Sub messaging
+  - Decoupled event consumers
+  - Integration bridge with Lab 6
+  - Separate monitoring stack
 end note
 
 @enduml

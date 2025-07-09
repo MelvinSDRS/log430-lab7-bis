@@ -1,0 +1,70 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Service de réclamations (Claims Service)
+  - job_name: 'claims-service'
+    static_configs:
+      - targets: ['claims-service:8101']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # Service de notifications
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['notification-service:8102']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # Service d'audit
+  - job_name: 'audit-service'
+    static_configs:
+      - targets: ['audit-service:8103']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # Service de projections
+  - job_name: 'projection-service'
+    static_configs:
+      - targets: ['projection-service:8104']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # Service de requêtes
+  - job_name: 'query-service'
+    static_configs:
+      - targets: ['query-service:8105']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # Service Event Store
+  - job_name: 'event-store-service'
+    static_configs:
+      - targets: ['event-store-service:8106']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # Prometheus lui-même
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Redis Streams monitoring (si redis_exporter est utilisé)
+  # - job_name: 'redis-streams'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+
+  # MongoDB monitoring (si mongodb_exporter est utilisé)
+  # - job_name: 'mongodb'
+  #   static_configs:
+  #     - targets: ['mongodb-exporter:9216']
+
+  # PostgreSQL monitoring (si postgres_exporter est utilisé)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']

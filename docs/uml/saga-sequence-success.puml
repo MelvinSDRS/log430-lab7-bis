@@ -1,0 +1,85 @@
+@startuml saga-sequence-success
+
+title Saga Orchestration - Scenario de Succes
+
+participant "Client" as C
+participant "API Gateway" as G
+participant "Saga Orchestrator" as SO
+participant "Cart Service" as CS
+participant "Inventory Service" as IS
+participant "Payment Service" as PS
+participant "Order Service" as OS
+participant "Prometheus" as PROM
+
+== Initialisation ==
+C -> G: POST /api/v1/sagas/orders
+G -> SO: POST /api/v1/sagas/orders
+SO -> SO: create saga_id
+SO -> PROM: saga_requests_total{status=PENDING}++
+
+== Etape 1: Validation Panier ==
+SO -> G: GET /api/v1/cart/carts/{session_id}
+G -> CS: GET /api/v1/carts/{session_id}
+CS --> G: 200 OK {cart_data}
+G --> SO: 200 OK {cart_data}
+SO -> SO: status = CART_VALIDATED
+SO -> PROM: saga_steps_total{step_type=VALIDATE_CART,status=completed}++
+
+== Etape 2: Reservation Stock ==
+SO -> G: POST /api/v1/inventory/reserve
+G -> IS: POST /api/v1/inventory/reserve
+IS -> IS: check stock availability
+IS -> IS: create reservation (expires in 10min)
+IS --> G: 201 Created {reservation_id}
+G --> SO: 201 Created {reservation_id}
+SO -> SO: status = STOCK_RESERVED
+SO -> PROM: saga_steps_total{step_type=RESERVE_STOCK,status=completed}++
+
+== Etape 3: Traitement Paiement ==
+SO -> G: POST /api/v1/payment/process
+G -> PS: POST /api/v1/payment/process
+PS -> PS: authorize card
+PS -> PS: capture payment
+PS --> G: 200 OK {transaction_id}
+G --> SO: 200 OK {transaction_id}
+SO -> SO: status = PAYMENT_PROCESSED
+SO -> PROM: saga_steps_total{step_type=PROCESS_PAYMENT,status=completed}++
+
+== Etape 4: Confirmation Commande ==
+SO -> G: POST /api/v1/orders/confirm
+G -> OS: POST /api/v1/orders/confirm
+OS -> OS: create order
+OS -> IS: PUT /api/v1/inventory/confirm
+IS -> IS: convert reservation to sale
+IS --> OS: 200 OK
+OS --> G: 201 Created {order_id}
+G --> SO: 201 Created {order_id}
+SO -> SO: status = ORDER_CONFIRMED
+SO -> PROM: saga_steps_total{step_type=CONFIRM_ORDER,status=completed}++
+
+== Etape 5: Finalisation ==
+SO -> SO: status = COMPLETED
+SO -> PROM: saga_requests_total{status=COMPLETED}++
+SO -> PROM: saga_duration_seconds{status=COMPLETED}.observe()
+
+== Reponse Finale ==
+SO --> G: 201 Created {saga_id, status=COMPLETED, order_id}
+G --> C: 201 Created {saga_id, status=COMPLETED, order_id}
+
+note right of SO
+Saga completee avec succes
+- Duree totale: ~2-5 secondes
+- Toutes les etapes executees
+- Metriques Prometheus mises a jour
+- Order_id genere pour le client
+end note
+
+note right of PROM
+Metriques collectees:
+- saga_requests_total{status=COMPLETED}
+- saga_duration_seconds (percentiles)
+- saga_steps_total par etape
+- Pas de compensation necessaire
+end note
+
+@enduml

@@ -1,8 +1,12 @@
-# Documentation Système Microservices POS + E-commerce - Lab 5
+# Documentation Système Microservices POS + E-commerce - Lab 6 & 7
 
 ## Vue d'ensemble
 
-Le **Lab 5** représente l'évolution finale vers une **architecture microservices cloud-native** intégrant un **écosystème commercial hybride POS + E-commerce** avec Kong Gateway et observabilité production-ready.
+Le projet montre l'évolution d'architectures distribuées avancées :
+- **Lab 6** : Architecture microservices avec **orchestration saga** pour transactions distribuées
+- **Lab 7** : Architecture **événementielle** avec Event Sourcing et CQRS pour gestion réclamations
+
+L'ensemble illustre différents patterns architecturaux pour systèmes distribués modernes.
 
 ### Évolution architecturale
 
@@ -17,6 +21,20 @@ Le **Lab 5** représente l'évolution finale vers une **architecture microservic
 - **Database per Service** : 7 PostgreSQL + 1 Redis isolés
 - **Observabilité stack** : Prometheus + Grafana + dashboards métier
 
+**Lab 6 : Architecture microservices avec Saga Orchestration**
+- **9 microservices autonomes** : Product, Customer, Cart, Order, Inventory, Sales, Reporting, Saga Orchestrator, Payment
+- **Saga Orchestration** : Coordination synchrone de transactions distribuées
+- **Compensation automatique** : Rollback intelligent en cas d'échec
+- **Database per Service** : 9 PostgreSQL + 1 Redis isolés
+- **Observabilité étendue** : Métriques saga et monitoring transactionnel
+
+**Lab 7 : Architecture événementielle avec Event Sourcing + CQRS**
+- **4 services événementiels** : Claims, Notification, Audit, Integration
+- **Event Sourcing** : MongoDB Event Store avec persistence immuable
+- **CQRS** : Séparation Command/Query avec read models PostgreSQL
+- **Pub/Sub messaging** : Redis Streams pour distribution événementielle
+- **Intégration inter-architectures** : Pont Lab 6 ↔ Lab 7 avec mode dégradé
+
 ## Architecture microservices
 
 ### Services métier
@@ -30,6 +48,8 @@ Le **Lab 5** représente l'évolution finale vers une **architecture microservic
 | **Customer Service** | 8005 | Authentification et profils clients | PostgreSQL (customer_db) |
 | **Cart Service** | 8006 | Panier e-commerce load-balanced | Redis (cart_cache) |
 | **Order Service** | 8007 | Commandes et checkout e-commerce | PostgreSQL (order_db) |
+| **Saga Orchestrator** | 8008 | Orchestration saga et compensation | In-Memory (saga_state) |
+| **Payment Service** | 8009 | Traitement paiements et remboursements | PostgreSQL (payment_db) |
 
 ### Infrastructure
 
@@ -73,7 +93,7 @@ Le **Lab 5** représente l'évolution finale vers une **architecture microservic
 
 ### 2. Décisions architecturales (ADRs)
 
-Les ADRs documentent les décisions clés du passage vers les microservices :
+Les ADRs documentent les décisions clés de l'évolution architecturale Lab 1 → Lab 7 :
 
 **[ADR-001 : Choix plateforme microservices](adr/001-choix-plateforme.md)**
 - Évolution des ADRs Lab 1-4 vers architecture distribuée
@@ -83,7 +103,7 @@ Les ADRs documentent les décisions clés du passage vers les microservices :
 - Database per Service pattern
 - Redis pour session state distribué
 
-**[ADR-003 : Séparation des responsabilités](adr/003-separation-responsabilites.md)**  
+**[ADR-003 : Séparation des responsabilités](adr/003-separation-responsabilites.md)**
 - Bounded contexts microservices
 - Communication patterns
 
@@ -95,6 +115,30 @@ Les ADRs documentent les décisions clés du passage vers les microservices :
 
 **[ADR-006 : API REST Flask-RESTX](adr/006-api-rest-flask-restx.md)**
 - Standards REST pour inter-service communication
+
+**[ADR-007 : Architecture Microservices](adr/007-architecture-microservices.md)**
+- Migration vers architecture microservices avec Database per Service
+- Décomposition bounded contexts et autonomie des équipes
+
+**[ADR-008 : Kong Gateway Load Balancing](adr/008-kong-gateway-load-balancing.md)**
+- API Gateway avec load balancing et observabilité
+- Authentication centralisée et rate limiting
+
+**[ADR-009 : Pattern Saga Orchestrée Synchrone](adr/009-saga-orchestration-pattern.md)**
+- Coordination transactions distribuées avec orchestrateur central
+- Machine d'état saga et compensation automatique
+
+**[ADR-010 : Communication via API Gateway](adr/010-communication-via-api-gateway.md)**
+- Kong Gateway pour communications saga orchestrator
+- Load balancing et sécurité centralisée
+
+**[ADR-011 : Redis Streams pour messagerie événementielle](adr/011-redis-streams-messaging.md)**
+- Choix Redis Streams pour Pub/Sub
+- Performance et simplicité architecturale
+
+**[ADR-012 : Intégration inter-architectures](adr/012-integration-inter-architectures.md)**
+- Service de pont Lab 6 ↔ Lab 7
+- Mode dégradé et réalisme métier
 
 ### 3. Diagrammes UML microservices
 
@@ -111,6 +155,52 @@ Les ADRs documentent les décisions clés du passage vers les microservices :
 - [Séquence reporting](uml/images/sequence_rapport.png) : Agrégation multi-services
 - [Séquence load balancing](uml/images/sequence_tableau_bord.png) : Cart Service failover
 
+**Diagrammes Saga Orchestration** :
+- [Machine d'état Saga](uml/images/saga-state-machine.png) : États et transitions saga
+- [Séquence saga succès](uml/images/saga-sequence-success.png) : Flux nominal de commande
+
+**Diagrammes Event-Driven Architecture (Lab 7)** :
+- [Composants événementiels](uml/composants.puml) : Architecture Event Sourcing + CQRS
+- [Déploiement Lab 7](uml/deploiement.puml) : Infrastructure événementielle
+- [Séquence réclamations](uml/sequence_claims_events.puml) : Flux événementiel complet
+
+## Architecture événementielle (Lab 7)
+
+### Services événementiels
+
+**Claims Service (8101)** : Producteur d'événements
+- Gestion cycle de vie des réclamations
+- Publication d'événements métier (5 types)
+- API REST pour commandes (Command Side CQRS)
+
+**Notification Service (8102)** : Abonné notifications
+- Traitement événements pour notifications email/SMS
+- Consumer Redis Streams avec groupes
+
+**Audit Service (8103)** : Abonné audit et conformité
+- Création piste d'audit complète
+- Enregistrement tous événements avec métriques
+
+**Integration Service (8107)** : Pont Lab 6 ↔ Lab 7
+- Enrichissement réclamations avec contexte commandes/clients
+- Mode dégradé si Lab 6 indisponible
+
+### Infrastructure événementielle
+
+**Redis Streams (6381)** : Backbone Pub/Sub
+- Distribution événements avec streams nommés
+- Consumer groups pour livraison garantie
+- Backpressure et replay capabilities
+
+**MongoDB Event Store (27018)** : Persistence Event Sourcing
+- Stockage immuable des événements
+- Capacité replay pour reconstruction d'état
+- Index optimisés par aggregate_id et event_type
+
+**PostgreSQL Read Models (5439)** : CQRS Query Side
+- Projections dénormalisées pour lectures optimisées
+- Mise à jour asynchrone via événements
+
 ## Déploiement et utilisation
 
 ### Démarrage rapide
@@ -118,29 +208,39 @@ Les ADRs documentent les décisions clés du passage vers les microservices :
 ```bash
 # Cloner le repository
 git clone <repository-url>
-cd log430-lab5
+cd log430-lab6
 
-# Déploiement microservices complet
+# Lab 6 - Déploiement microservices avec saga
 cd microservices/
 docker-compose up -d
 
+# Lab 7 - Déploiement architecture événementielle  
+cd event-driven/
+docker-compose up -d
+
 # Vérification santé services
-curl http://localhost:8080/health
+curl http://localhost:8080/health          # Lab 6 Kong Gateway
+curl http://localhost:8101/health          # Lab 7 Claims Service
 ```
 
 ### Points d'accès
 
-**Kong API Gateway** : http://localhost:8080
+**Lab 6 - Kong API Gateway** : http://localhost:8080
 - Point d'entrée unique pour tous les services
 - Documentation OpenAPI : http://localhost:8080/docs
 - Health check global : http://localhost:8080/health
 
+**Lab 7 - Services événementiels** :
+- **Claims Service** : http://localhost:8101/docs
+- **Notification Service** : http://localhost:8102/health
+- **Audit Service** : http://localhost:8103/health
+- **Integration Service** : http://localhost:8107/health
+
 **Observabilité stack** :
-- **Grafana dashboards** : http://localhost:3000
-  - Kong API Gateway Overview
-  - Microservices Health Monitoring  
-  - Business KPIs Dashboard
-- **Prometheus metrics** : http://localhost:9090
+- **Grafana Lab 6** : http://localhost:3000 (Kong + Microservices)
+- **Grafana Lab 7** : http://localhost:3001 (Event-Driven Dashboard)
+- **Prometheus Lab 6** : http://localhost:9090
+- **Prometheus Lab 7** : http://localhost:9091
 - **Kong Admin API** : http://localhost:8001
 
 ### Tests de performance
