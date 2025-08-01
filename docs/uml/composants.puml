@@ -1,300 +1,180 @@
-@startuml
-package "Architecture Distribuée Lab 7 - Saga Orchestration + Event-Driven" {
+@startuml composants_etape3
+!define RECTANGLE class
 
-  ' API Gateway Layer
-  package "API Gateway Layer" {
-    [Kong Gateway] as KONG
-    [Route Management] as ROUTES
-    [Authentication Service] as AUTH
-    [Rate Limiting] as RATE_LIMIT
-    [Load Balancer] as LB
-    [CORS Handler] as CORS
-  }
-  
-  ' Microservices Business Layer
-  package "Microservices Business Layer" {
-    
-    package "Product Bounded Context" {
-      [Product Service] as PRODUCT_SVC
-      [Product Domain Logic] as PRODUCT_DOMAIN
-      [Product Repository] as PRODUCT_REPO
-    }
-    
-    package "Inventory Bounded Context" {
-      [Inventory Service] as INVENTORY_SVC
-      [Stock Management] as STOCK_DOMAIN
-      [Inventory Repository] as INVENTORY_REPO
-    }
-    
-    package "Sales Bounded Context" {
-      [Sales Service] as SALES_SVC
-      [Transaction Logic] as SALES_DOMAIN
-      [Sales Repository] as SALES_REPO
-    }
-    
-    package "Reporting Bounded Context" {
-      [Reporting Service] as REPORTING_SVC
-      [Analytics Engine] as ANALYTICS_DOMAIN
-      [Reporting Repository] as REPORTING_REPO
-    }
-    
-    package "Customer Bounded Context" {
-      [Customer Service] as CUSTOMER_SVC
-      [Customer Domain] as CUSTOMER_DOMAIN
-      [Customer Repository] as CUSTOMER_REPO
-    }
-    
-    package "Cart Bounded Context" {
-      [Cart Service Cluster] as CART_CLUSTER
-      [Cart Business Logic] as CART_DOMAIN
-      [Cart Cache Layer] as CART_CACHE_LAYER
-    }
-    
-    package "Order Bounded Context" {
-      [Order Service] as ORDER_SVC
-      [Order Processing] as ORDER_DOMAIN
-      [Order Repository] as ORDER_REPO
-    }
-    
-    package "Saga Orchestration Context" {
-      [Saga Orchestrator] as SAGA_ORCHESTRATOR
-      [Saga State Machine] as SAGA_STATE
-      [Compensation Engine] as COMPENSATION_ENGINE
-    }
-    
-    package "Payment Bounded Context" {
-      [Payment Service] as PAYMENT_SVC
-      [Payment Processing] as PAYMENT_DOMAIN
-      [Payment Gateway] as PAYMENT_GATEWAY
-    }
-  }
-  
-  ' Lab 7 Event-Driven Layer
-  package "Event-Driven Architecture (Lab 7)" {
-    
-    package "Event Infrastructure" {
-      [Redis Streams] as REDIS_STREAMS
-      [Event Bus] as EVENT_BUS_LAB7
-    }
-    
-    package "Claims Bounded Context" {
-      [Claims Service] as CLAIMS_SVC
-      [Claims Domain Logic] as CLAIMS_DOMAIN
-      [Event Publisher] as EVENT_PUBLISHER
-    }
-    
-    package "Event Consumers" {
-      [Notification Service] as NOTIFICATION_SVC
-      [Audit Service] as AUDIT_SVC
-      [Integration Service] as INTEGRATION_SVC
-    }
-    
-    package "CQRS Read Side" {
-      [Query Service] as QUERY_SVC
-      [Projection Service] as PROJECTION_SVC
-    }
-  }
-  
-  ' Data Layer
-  package "Data Persistence Layer" {
-    database "Product DB\n(PostgreSQL)" as PRODUCT_DB
-    database "Inventory DB\n(PostgreSQL)" as INVENTORY_DB
-    database "Sales DB\n(PostgreSQL)" as SALES_DB
-    database "Reporting DB\n(PostgreSQL)" as REPORTING_DB
-    database "Customer DB\n(PostgreSQL)" as CUSTOMER_DB
-    database "Cart Cache\n(Redis)" as CART_CACHE
-    database "Order DB\n(PostgreSQL)" as ORDER_DB
-    database "Payment DB\n(PostgreSQL)" as PAYMENT_DB
-    database "Saga State\n(In-Memory)" as SAGA_STATE_DB
-    database "Event Store\n(MongoDB)" as EVENT_STORE_DB
-    database "Read Models\n(PostgreSQL)" as READ_MODELS_DB
-    database "Event Streams\n(Redis)" as EVENT_STREAMS_DB
-  }
-  
-  ' Cross-cutting Concerns
-  package "Cross-cutting Concerns" {
-    [Event Bus] as EVENT_BUS
-    [Metrics Collector] as METRICS
-    [Health Checks] as HEALTH
-    [Configuration Service] as CONFIG
-    [Logging Service] as LOGGING
-  }
-  
-  ' Monitoring Stack
-  package "Observability Stack" {
-    [Prometheus] as PROMETHEUS
-    [Grafana Dashboards] as GRAFANA
-    [Kong Admin API] as KONG_ADMIN
-    }
-  }
-  
-' External Systems
-package "External Clients" {
-  [E-commerce Frontend] as WEB_APP
-  [Mobile Application] as MOBILE_APP
-  [POS Terminals] as POS_TERMINALS
-  [Admin Dashboard] as ADMIN_DASHBOARD
-  [External APIs] as EXTERNAL_APIS
+title Diagramme de Composants - Étape 3
+
+package "Lab 6 - Saga Orchestrée (Synchrone)" {
+    component [Saga Orchestrator] as SagaOrch
+    component [Payment Service] as PaymentSvc
+    component [Cart Service Enhanced] as CartSvcEnh
+    component [Inventory Service Enhanced] as InvSvcEnh
+    component [Order Service Enhanced] as OrderSvcEnh
+
+    database "Saga State Store" as SagaDB
+    database "Payment DB" as PaymentDB
+
+    SagaOrch --> SagaDB
+    PaymentSvc --> PaymentDB
+
+    note top of SagaOrch : Orchestration centralisée\nMachine d'états explicite\nCompensation automatique
 }
 
-' Kong Gateway internal connections
-KONG *-- ROUTES
-KONG *-- AUTH
-KONG *-- RATE_LIMIT
-KONG *-- LB
-KONG *-- CORS
+package "Lab 7 - Architecture Événementielle (Asynchrone)" {
+    component [Claims Service] as ClaimsSvc
+    component [Notification Service] as NotifSvc
+    component [Audit Service] as AuditSvc
+    component [Projection Service] as ProjSvc
+    component [Query Service] as QuerySvc
+    component [Event Store Service] as EventStoreSvc
+    component [Integration Service] as IntegSvc
 
-' API Gateway to Services
-KONG --> PRODUCT_SVC : "Product APIs"
-KONG --> INVENTORY_SVC : "Inventory APIs"
-KONG --> SALES_SVC : "Sales APIs"
-KONG --> REPORTING_SVC : "Reporting APIs"
-KONG --> CUSTOMER_SVC : "Customer APIs"
-KONG --> CART_CLUSTER : "Cart APIs (Load Balanced)"
-KONG --> ORDER_SVC : "Order APIs"
-KONG --> SAGA_ORCHESTRATOR : "Saga APIs"
-KONG --> PAYMENT_SVC : "Payment APIs"
+    database "Event Store (MongoDB)" as EventStore
+    database "Read Models (PostgreSQL)" as ReadModels
 
-' Service internal structure
-PRODUCT_SVC *-- PRODUCT_DOMAIN
-PRODUCT_DOMAIN --> PRODUCT_REPO
-INVENTORY_SVC *-- STOCK_DOMAIN
-STOCK_DOMAIN --> INVENTORY_REPO
-SALES_SVC *-- SALES_DOMAIN
-SALES_DOMAIN --> SALES_REPO
-REPORTING_SVC *-- ANALYTICS_DOMAIN
-ANALYTICS_DOMAIN --> REPORTING_REPO
-CUSTOMER_SVC *-- CUSTOMER_DOMAIN
-CUSTOMER_DOMAIN --> CUSTOMER_REPO
-CART_CLUSTER *-- CART_DOMAIN
-CART_DOMAIN --> CART_CACHE_LAYER
-ORDER_SVC *-- ORDER_DOMAIN
-ORDER_DOMAIN --> ORDER_REPO
-SAGA_ORCHESTRATOR *-- SAGA_STATE
-SAGA_ORCHESTRATOR *-- COMPENSATION_ENGINE
-PAYMENT_SVC *-- PAYMENT_DOMAIN
-PAYMENT_DOMAIN --> PAYMENT_GATEWAY
+    ClaimsSvc --> EventStore
+    EventStoreSvc --> EventStore
+    ProjSvc --> ReadModels
+    QuerySvc --> ReadModels
 
-' Repository to Database connections
-PRODUCT_REPO --> PRODUCT_DB
-INVENTORY_REPO --> INVENTORY_DB
-SALES_REPO --> SALES_DB
-REPORTING_REPO --> REPORTING_DB
-CUSTOMER_REPO --> CUSTOMER_DB
-CART_CACHE_LAYER --> CART_CACHE
-ORDER_REPO --> ORDER_DB
-PAYMENT_GATEWAY --> PAYMENT_DB
-SAGA_STATE --> SAGA_STATE_DB
+    note top of ClaimsSvc : Command Side (CQRS)\nPublie des événements
+    note top of QuerySvc : Query Side (CQRS)\nLecture optimisée
+}
 
-' Lab 7 Event-Driven connections
-CLAIMS_SVC *-- CLAIMS_DOMAIN
-CLAIMS_DOMAIN --> EVENT_PUBLISHER
-EVENT_PUBLISHER --> REDIS_STREAMS
-EVENT_PUBLISHER --> EVENT_STORE_DB
-REDIS_STREAMS --> EVENT_STREAMS_DB
-REDIS_STREAMS --> NOTIFICATION_SVC
-REDIS_STREAMS --> AUDIT_SVC
-PROJECTION_SVC --> READ_MODELS_DB
-QUERY_SVC --> READ_MODELS_DB
+package "Lab 7 bis - Saga Chorégraphiée (Décentralisée)" {
+    component [Refund Payment Service] as RefundPaySvc
+    component [Refund Inventory Service] as RefundInvSvc
+    component [Notification Service Shared] as NotifShared
 
-' Lab 6 <-> Lab 7 Integration
-INTEGRATION_SVC ..> ORDER_SVC : "Fetch order context"
-INTEGRATION_SVC ..> CUSTOMER_SVC : "Fetch customer context"
+    note top of RefundPaySvc : Coordination décentralisée\nPas d'orchestrateur\nÉvénements asynchrones
+}
 
-' Inter-service communication
-SALES_SVC ..> INVENTORY_SVC : "Stock validation"
-SALES_SVC ..> PRODUCT_SVC : "Product lookup"
-REPORTING_SVC ..> SALES_SVC : "Sales data aggregation"
-REPORTING_SVC ..> INVENTORY_SVC : "Stock metrics"
-ORDER_SVC ..> CART_CLUSTER : "Cart checkout"
-ORDER_SVC ..> INVENTORY_SVC : "Stock reservation"
-ORDER_SVC ..> CUSTOMER_SVC : "Customer validation"
+package "Infrastructure Partagée" {
+    component [Kong API Gateway] as Kong
+    component [Redis Streams] as RedisStreams
+    component [Prometheus] as Prometheus
+    component [Grafana] as Grafana
 
-' Saga Orchestration communication
-SAGA_ORCHESTRATOR ..> CART_CLUSTER : "Cart validation"
-SAGA_ORCHESTRATOR ..> INVENTORY_SVC : "Stock reservation"
-SAGA_ORCHESTRATOR ..> PAYMENT_SVC : "Payment processing"
-SAGA_ORCHESTRATOR ..> ORDER_SVC : "Order confirmation"
-SAGA_ORCHESTRATOR ..> PROMETHEUS : "Saga metrics"
+    database "Redis Cache" as RedisCache
+    database "Kong DB" as KongDB
 
-' Cross-cutting concerns
-PRODUCT_SVC --> EVENT_BUS
-INVENTORY_SVC --> EVENT_BUS
-SALES_SVC --> EVENT_BUS
-ORDER_SVC --> EVENT_BUS
+    Kong --> KongDB
+    Kong --> RedisCache
 
-PRODUCT_SVC --> METRICS
-INVENTORY_SVC --> METRICS
-SALES_SVC --> METRICS
-REPORTING_SVC --> METRICS
-CUSTOMER_SVC --> METRICS
-CART_CLUSTER --> METRICS
-ORDER_SVC --> METRICS
-SAGA_ORCHESTRATOR --> METRICS
-PAYMENT_SVC --> METRICS
-CLAIMS_SVC --> METRICS
-NOTIFICATION_SVC --> METRICS
-AUDIT_SVC --> METRICS
+    note bottom of RedisStreams : Message Broker commun\naux Labs 7 et 7 bis
+}
 
-' Monitoring connections
-METRICS --> PROMETHEUS
-PROMETHEUS --> GRAFANA
-KONG --> KONG_ADMIN
+package "Services Base (Héritage Lab 5)" {
+    component [Product Service] as ProductSvc
+    component [Customer Service] as CustomerSvc
+    component [Sales Service] as SalesSvc
+    component [Reporting Service] as ReportingSvc
 
-' Client connections
-WEB_APP --> KONG : "HTTPS/API Key"
-MOBILE_APP --> KONG : "HTTPS/API Key"
-POS_TERMINALS --> KONG : "API Key Auth"
-ADMIN_DASHBOARD --> KONG : "JWT Auth"
-EXTERNAL_APIS --> KONG : "API Key Auth"
+    database "Product DB" as ProductDB
+    database "Customer DB" as CustomerDB
+    database "Sales DB" as SalesDB
+    database "Reporting DB" as ReportingDB
 
-note top of KONG
-  Kong Gateway Capabilities:
-  - Unified API endpoint (port 8080)
-  - Authentication (API Key + JWT)
-  - Rate limiting & throttling
-  - Load balancing (Cart Service)
-  - Request/Response transformation
-  - Circuit breaker & health checks
+    ProductSvc --> ProductDB
+    CustomerSvc --> CustomerDB
+    SalesSvc --> SalesDB
+    ReportingSvc --> ReportingDB
+}
+
+' Interfaces externes
+interface "REST API" as RestAPI
+interface "Event Streams" as EventStreams
+interface "Metrics API" as MetricsAPI
+
+' Relations Lab 6 - Communications synchrones via Kong
+Kong --> SagaOrch : Route /saga
+Kong --> PaymentSvc : Route /payment
+Kong --> CartSvcEnh : Route /cart (3 instances LB)
+Kong --> InvSvcEnh : Route /inventory
+Kong --> OrderSvcEnh : Route /order
+
+SagaOrch ..> Kong : API Calls
+SagaOrch --> CartSvcEnh : Validate Cart
+SagaOrch --> InvSvcEnh : Reserve Stock
+SagaOrch --> PaymentSvc : Process Payment
+SagaOrch --> OrderSvcEnh : Confirm Order
+
+' Relations Lab 7 - Communications asynchrones via événements
+ClaimsSvc --> RedisStreams : Publish Events
+NotifSvc --> RedisStreams : Subscribe Events
+AuditSvc --> RedisStreams : Subscribe Events
+ProjSvc --> RedisStreams : Subscribe Events
+
+RedisStreams --> EventStore : Persist Events
+ProjSvc --> ReadModels : Update Projections
+
+' Relations Lab 7 bis - Communications asynchrones décentralisées
+ClaimsSvc --> RedisStreams : SagaRemboursementDemarree
+RefundPaySvc --> RedisStreams : RemboursementCalcule
+RefundInvSvc --> RedisStreams : StockMisAJour
+NotifShared --> RedisStreams : SagaRemboursementTerminee
+
+' Intégration Lab 6 ↔ Lab 7
+IntegSvc --> Kong : Read Lab 6 Data
+IntegSvc --> ClaimsSvc : Enrich Claims
+
+' Monitoring et observabilité
+SagaOrch --> Prometheus : Saga Metrics
+ClaimsSvc --> Prometheus : Event Metrics
+RefundPaySvc --> Prometheus : Refund Metrics
+RefundInvSvc --> Prometheus : Stock Metrics
+
+Prometheus --> Grafana : Data Source
+
+' Interfaces externes
+Kong -- RestAPI
+RedisStreams -- EventStreams
+Prometheus -- MetricsAPI
+
+' Relations base services avec Kong
+Kong --> ProductSvc : Route /product
+Kong --> CustomerSvc : Route /customer
+Kong --> SalesSvc : Route /sales
+Kong --> ReportingSvc : Route /reporting
+
+' Notes architecturales
+note as N1
+**Patterns Architecturaux**
+
+**Lab 6 - Saga Orchestrée:**
+• Coordination centralisée
+• Communication synchrone
+• État global visible
+• Compensation déterministe
+
+**Lab 7 - Architecture Événementielle:**
+• Event Sourcing + CQRS
+• Découplage temporel
+• Projections optimisées
+• Audit trail complet
+
+**Lab 7 bis - Saga Chorégraphiée:**
+• Coordination décentralisée
+• Pas d'orchestrateur central
+• Résilience distribuée
+• Compensation locale
 end note
 
-note right of "Microservices Business Layer"
-  Domain-Driven Design + Saga Pattern:
-  - Each service owns its bounded context
-  - Database per service pattern
-  - Saga orchestration for distributed transactions
-  - Compensation actions for failure recovery
-  - Service autonomy with coordinated consistency
-  - Clear business domain separation
-end note
+note as N2
+**Communications**
 
-note right of "Saga Orchestration Context"
-  Saga Orchestrator Features:
-  - Synchronous orchestration pattern
-  - State machine-based coordination
-  - Automatic compensation on failures
-  - Prometheus metrics integration
-  - Timeout and retry mechanisms
-  - In-memory state management
-end note
+**Synchrone (Lab 6):**
+HTTP/REST via Kong Gateway
+Timeout et circuit breakers
 
-note bottom of CART_CLUSTER
-  Cart Service Load Balancing:
-  - 3 identical instances
-  - Redis shared cache for session state
-  - Kong upstream configuration
-  - Health check monitoring
-  - Automatic failover
-end note
+**Asynchrone (Lab 7/7bis):**
+Redis Streams pub/sub
+Event Store MongoDB
+Consumer Groups
 
-note right of "Event-Driven Architecture (Lab 7)"
-  Event Sourcing + CQRS Pattern:
-  - Event-driven claims management
-  - Redis Streams for Pub/Sub messaging
-  - MongoDB Event Store for persistence
-  - CQRS with separate read/write models
-  - Integration bridge with Lab 6
-  - Decoupled event consumers
+**Observabilité:**
+Prometheus metrics
+Grafana dashboards
+Structured logging
 end note
 
 @enduml

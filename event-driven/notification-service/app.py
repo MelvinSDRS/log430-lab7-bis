@@ -11,6 +11,7 @@ from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_
 from pymongo import MongoClient
 
 from event_consumer import EventConsumer
+from event_publisher import EventPublisher
 
 # Configuration de logging structuré
 structlog.configure(
@@ -48,6 +49,9 @@ mongo_url = os.getenv('MONGO_URL', 'mongodb://localhost:27017/event_store')
 
 # Stockage des notifications envoyées
 notifications_store = []
+
+# Initialiser l'event publisher pour la saga
+event_publisher = EventPublisher(redis_url, mongo_url)
 
 class NotificationService:
     def __init__(self):
@@ -250,6 +254,7 @@ event_consumer.register_handler('ReclamationCreee', handle_reclamation_creee)
 event_consumer.register_handler('ReclamationAffectee', handle_reclamation_affectee)
 event_consumer.register_handler('ReclamationResolue', handle_reclamation_resolue)
 event_consumer.register_handler('ReclamationCloturee', handle_reclamation_cloturee)
+event_consumer.register_handler('StockMisAJour', handle_stock_mis_a_jour)
 
 @api.route('/notifications')
 class NotificationsResource(Resource):
@@ -278,6 +283,65 @@ class NotificationStatsResource(Resource):
                 stats['by_event_type'][event_type] = stats['by_event_type'].get(event_type, 0) + 1
         
         return stats
+
+def handle_stock_mis_a_jour(event_data: Dict[str, Any]):
+    """Traite l'événement StockMisAJour pour terminer la saga"""
+    with PROCESSING_DURATION.labels(event_type='StockMisAJour').time():
+        try:
+            claim_id = event_data.get('aggregate_id')
+            correlation_id = event_data.get('correlation_id')
+            data = event_data.get('data', {})
+            if isinstance(data, str):
+                import json
+                data = json.loads(data)
+            
+            customer_id = data.get('customer_id')
+            product_id = data.get('product_id')
+            refund_amount = data.get('refund_amount')
+            
+            # Envoyer notification de remboursement au client
+            notification_service.send_email_notification(
+                recipient=f"customer_{customer_id}@example.com",
+                subject=f"Remboursement traité pour réclamation #{claim_id}",
+                body=f"Votre remboursement a été traité avec succès.\n\nMontant: {refund_amount}$ CAD\nProduit: {product_id}\n\nLe montant sera crédité sur votre compte dans 3-5 jours ouvrables.",
+                event_data=event_data
+            )
+            
+            # Publier l'événement de fin de saga
+            saga_completion_data = {
+                "claim_id": claim_id,
+                "customer_id": customer_id,
+                "product_id": product_id,
+                "refund_amount": refund_amount,
+                "notification_sent_at": datetime.utcnow().isoformat(),
+                "saga_step": "saga_completed"
+            }
+            
+            event_publisher.publish_event(
+                event_type='SagaRemboursementTerminee',
+                aggregate_id=claim_id,
+                data=saga_completion_data,
+                correlation_id=correlation_id
+            )
+            
+            # Métriques
+            NOTIFICATIONS_SENT.labels(notification_type='email', event_type='StockMisAJour').inc()
+            EVENTS_PROCESSED.labels(event_type='StockMisAJour').inc()
+            
+            logger.info(
+                "Refund saga completed",
+                claim_id=claim_id,
+                customer_id=customer_id,
+                refund_amount=refund_amount,
+                correlation_id=correlation_id
+            )
+            
+        except Exception as e:
+            logger.error(
+                "Error handling StockMisAJour event",
+                error=str(e),
+                event_data=event_data
+            )
 
 @app.route('/health')
 def health():

@@ -96,7 +96,9 @@ def init_app():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    app.logger.info("Cart Service démarré sur le port 8006")
+    app.logger.info(f"[CART] Service démarré sur le port 8006 - Instance: {INSTANCE_ID}")
+    app.logger.info(f"[CART] Connexion Redis initialisée - URL: {REDIS_URL}")
+    app.logger.info(f"[CART] Service name: {SERVICE_NAME}")
 
 # Endpoints Panier
 @api.route('/carts/<string:session_id>')

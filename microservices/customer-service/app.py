@@ -92,7 +92,8 @@ def init_app():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    app.logger.info("Customer Service démarré sur le port 8005")
+    app.logger.info("[CUSTOMER] Service démarré sur le port 8005")
+    app.logger.info("[CUSTOMER] Base de données initialisée")
 
 # Endpoints Authentification
 @api.route('/auth/register')
@@ -103,19 +104,24 @@ class CustomerRegister(Resource):
         """Créer un nouveau compte client"""
         try:
             data = request.get_json()
+            
+            app.logger.info(f"[CUSTOMER] Début enregistrement client - Email: {data.get('email', 'N/A')}")
+            app.logger.debug(f"[CUSTOMER] Données enregistrement: {data}")
+            
             auth_service = AuthService(db_session)
             customer = auth_service.register_customer(data)
             
-            app.logger.info(f"Nouveau client enregistré: {customer['email']} (ID: {customer['id']})")
+            app.logger.info(f"[CUSTOMER] Client enregistré avec succès - Email: {customer['email']}, ID: {customer['id']}")
             return {
                 'message': 'Compte créé avec succès',
                 'customer': customer
             }, 201
             
         except ValueError as e:
+            app.logger.warning(f"[CUSTOMER] Données invalides pour enregistrement: {str(e)}")
             api.abort(400, str(e))
         except Exception as e:
-            app.logger.error(f"Erreur lors de l'enregistrement: {str(e)}")
+            app.logger.error(f"[CUSTOMER] Erreur enregistrement: {str(e)}")
             api.abort(500, f"Erreur interne: {str(e)}")
 
 @api.route('/auth/login')
@@ -126,17 +132,22 @@ class CustomerLogin(Resource):
         """Authentifier un client et retourner un token JWT"""
         try:
             data = request.get_json()
+            email = data.get('email', 'N/A')
+            
+            app.logger.info(f"[CUSTOMER] Tentative authentification - Email: {email}")
+            
             auth_service = AuthService(db_session)
-            result = auth_service.authenticate_customer(data['email'], data['password'])
+            result = auth_service.authenticate_customer(email, data.get('password', ''))
             
             if not result:
+                app.logger.warning(f"[CUSTOMER] Échec authentification - Email: {email}")
                 api.abort(401, "Email ou mot de passe incorrect")
             
-            app.logger.info(f"Client authentifié: {data['email']}")
+            app.logger.info(f"[CUSTOMER] Authentification réussie - Email: {email}")
             return result, 200
             
         except Exception as e:
-            app.logger.error(f"Erreur lors de l'authentification: {str(e)}")
+            app.logger.error(f"[CUSTOMER] Erreur authentification: {str(e)}")
             api.abort(500, f"Erreur interne: {str(e)}")
 
 # Endpoints Gestion des clients
@@ -151,19 +162,24 @@ class CustomerList(Resource):
             page = int(request.args.get('page', 1))
             per_page = min(int(request.args.get('per_page', 20)), 100)
             
+            app.logger.info(f"[CUSTOMER] Requête liste clients - Page: {page}, Par page: {per_page}")
+            
             service = CustomerService(db_session)
             customers = service.get_customers_paginated(page, per_page)
+            total = service.count_customers()
+            
+            app.logger.info(f"[CUSTOMER] Liste clients récupérée - {len(customers)} clients sur {total} total")
             
             return {
                 'data': customers,
                 'meta': {
                     'page': page,
                     'per_page': per_page,
-                    'total': service.count_customers()
+                    'total': total
                 }
             }
         except Exception as e:
-            app.logger.error(f"Erreur lors de la récupération des clients: {str(e)}")
+            app.logger.error(f"[CUSTOMER] Erreur récupération clients: {str(e)}")
             api.abort(500, f"Erreur interne: {str(e)}")
 
 @api.route('/customers/<int:customer_id>')
@@ -174,16 +190,20 @@ class Customer(Resource):
         """Récupérer un client spécifique"""
         try:
             # TODO: Vérifier que l'utilisateur peut accéder à ce profil
+            app.logger.info(f"[CUSTOMER] Recherche client - ID: {customer_id}")
+            
             service = CustomerService(db_session)
             customer = service.get_customer_by_id(customer_id)
             
             if not customer:
+                app.logger.warning(f"[CUSTOMER] Client non trouvé - ID: {customer_id}")
                 api.abort(404, f"Client {customer_id} non trouvé")
             
+            app.logger.info(f"[CUSTOMER] Client récupéré - ID: {customer_id}, Email: {customer.get('email', 'N/A')}")
             return customer
             
         except Exception as e:
-            app.logger.error(f"Erreur lors de la récupération du client {customer_id}: {str(e)}")
+            app.logger.error(f"[CUSTOMER] Erreur récupération client {customer_id}: {str(e)}")
             api.abort(500, f"Erreur interne: {str(e)}")
     
     @api.expect(customer_model)
@@ -194,6 +214,10 @@ class Customer(Resource):
         try:
             # TODO: Vérifier autorisation
             data = request.get_json()
+            
+            app.logger.info(f"[CUSTOMER] Début mise à jour client - ID: {customer_id}")
+            app.logger.debug(f"[CUSTOMER] Données de mise à jour: {data}")
+            
             service = CustomerService(db_session)
             customer = service.update_customer(customer_id, data)
             

@@ -118,29 +118,35 @@ class PaymentProcessResource(Resource):
             amount = data.get('amount')
             currency = data.get('currency', 'CAD')
             
+            app.logger.info(f"[PAYMENT] Début traitement paiement - Transaction: {transaction_id}, Client: {customer_id}, Montant: {amount} {currency}")
+            
             if not all([transaction_id, customer_id, amount]):
+                app.logger.warning(f"[PAYMENT] Données manquantes - Transaction: {transaction_id}, Data: {data}")
                 return {'error': 'transaction_id, customer_id et amount sont requis'}, 400
             
             if amount <= 0:
+                app.logger.warning(f"[PAYMENT] Montant invalide - Transaction: {transaction_id}, Montant: {amount}")
                 return {'error': 'Le montant doit être positif'}, 400
             
             # Vérifier si la transaction existe déjà
             if transaction_id in transactions_db:
                 existing = transactions_db[transaction_id]
-                app.logger.info(f"Transaction {transaction_id} déjà traitée")
+                app.logger.info(f"[PAYMENT] Transaction existante retournée - ID: {transaction_id}, Statut: {existing.get('status')}")
                 return existing, 200
             
             # Simulation du temps de traitement
             processing_time = random.uniform(0.5, 2.0)
+            app.logger.debug(f"[PAYMENT] Temps de traitement simulé - {processing_time:.2f}s")
             time.sleep(processing_time)
             
             # Vérifier si on doit simuler un échec
             should_fail, failure_reason = should_simulate_failure(amount, transaction_id)
             
             if should_fail:
-                app.logger.warning(f"Simulation d'échec de paiement: {failure_reason}")
+                app.logger.warning(f"[PAYMENT] Simulation échec paiement - Transaction: {transaction_id}, Raison: {failure_reason}")
                 
                 # Enregistrer l'échec
+                app.logger.info(f"[PAYMENT] Enregistrement échec paiement - Transaction: {transaction_id}")
                 failed_transaction = {
                     'transaction_id': transaction_id,
                     'status': 'failed',

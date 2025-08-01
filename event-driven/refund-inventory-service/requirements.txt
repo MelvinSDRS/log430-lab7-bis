@@ -1,0 +1,7 @@
+Flask==2.3.3
+flask-restx==1.1.0
+redis==5.0.1
+pymongo==4.5.0
+structlog==23.1.0
+prometheus-client==0.17.1
+requests==2.31.0

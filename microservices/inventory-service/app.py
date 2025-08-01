@@ -113,6 +113,8 @@ class InventoryResource(Resource):
         try:
             location_id = request.args.get('location_id', 1, type=int)
             
+            app.logger.info(f"[INVENTORY] Requête inventaire - Emplacement: {location_id}")
+            
             items = []
             for item in inventory_db.values():
                 if item['location_id'] == location_id:
@@ -121,10 +123,11 @@ class InventoryResource(Resource):
                         'total_quantity': item['available_quantity'] + item['reserved_quantity']
                     })
             
+            app.logger.info(f"[INVENTORY] Inventaire récupéré - Emplacement: {location_id}, Items: {len(items)}")
             return items, 200
             
         except Exception as e:
-            app.logger.error(f"Erreur lors de la récupération de l'inventaire: {e}")
+            app.logger.error(f"[INVENTORY] Erreur récupération inventaire: {e}")
             return {'error': str(e)}, 500
 
 @api.route('/inventory/<int:product_id>')
@@ -138,17 +141,23 @@ class InventoryItemResource(Resource):
         try:
             location_id = request.args.get('location_id', 1, type=int)
             
+            app.logger.debug(f"[INVENTORY] Recherche stock - Produit: {product_id}, Emplacement: {location_id}")
+            
             item = get_inventory_item(product_id, location_id)
             if not item:
+                app.logger.warning(f"[INVENTORY] Produit non trouvé - ID: {product_id}, Emplacement: {location_id}")
                 return {'error': 'Produit non trouvé dans l\'inventaire'}, 404
             
-            return {
+            result = {
                 **item,
                 'total_quantity': item['available_quantity'] + item['reserved_quantity']
-            }, 200
+            }
+            
+            app.logger.info(f"[INVENTORY] Stock récupéré - Produit: {product_id}, Disponible: {item['available_quantity']}, Réservé: {item['reserved_quantity']}")
+            return result, 200
             
         except Exception as e:
-            app.logger.error(f"Erreur lors de la récupération du produit {product_id}: {e}")
+            app.logger.error(f"[INVENTORY] Erreur récupération produit {product_id}: {e}")
             return {'error': str(e)}, 500
 
 @api.route('/inventory/reserve')
@@ -167,38 +176,48 @@ class ReservationResource(Resource):
             customer_id = data.get('customer_id')
             items_to_reserve = data.get('items', [])
             
+            app.logger.info(f"[INVENTORY] Début réservation - ID: {reservation_id}, Client: {customer_id}, Items: {len(items_to_reserve)}")
+            
             if not all([reservation_id, customer_id, items_to_reserve]):
+                app.logger.warning(f"[INVENTORY] Données manquantes pour réservation: {data}")
                 return {'error': 'reservation_id, customer_id et items sont requis'}, 400
             
             # Vérifier si la réservation existe déjà
             if reservation_id in reservations_db:
                 existing = reservations_db[reservation_id]
-                app.logger.info(f"Réservation {reservation_id} déjà existante")
+                app.logger.info(f"[INVENTORY] Réservation existante retournée - ID: {reservation_id}")
                 return existing, 200
             
             # Valider et préparer la réservation
             reserved_items = []
+            
+            app.logger.debug(f"[INVENTORY] Validation de {len(items_to_reserve)} items à réserver")
             
             for item_request in items_to_reserve:
                 product_id = item_request.get('product_id')
                 quantity = item_request.get('quantity', 0)
                 location_id = item_request.get('location_id', 1)
                 
+                app.logger.debug(f"[INVENTORY] Validation item - Produit: {product_id}, Quantité: {quantity}, Emplacement: {location_id}")
+                
                 if not product_id or quantity <= 0:
+                    app.logger.warning(f"[INVENTORY] Item invalide - Produit: {product_id}, Quantité: {quantity}")
                     return {'error': f'product_id et quantity valides requis pour chaque item'}, 400
                 
                 # Vérifier la simulation d'échec
                 should_fail, failure_reason = should_simulate_failure(product_id)
                 if should_fail:
-                    app.logger.warning(f"Simulation d'échec de réservation: {failure_reason}")
+                    app.logger.warning(f"[INVENTORY] Simulation échec réservation - Produit: {product_id}: {failure_reason}")
                     return {'error': failure_reason}, 409  # Conflict
                 
                 # Vérifier la disponibilité
                 inventory_item = get_inventory_item(product_id, location_id)
                 if not inventory_item:
+                    app.logger.error(f"[INVENTORY] Produit inexistant pour réservation - ID: {product_id}, Emplacement: {location_id}")
                     return {'error': f'Produit {product_id} non trouvé dans l\'inventaire'}, 404
                 
                 if inventory_item['available_quantity'] < quantity:
+                    app.logger.warning(f"[INVENTORY] Stock insuffisant - Produit: {product_id}, Disponible: {inventory_item['available_quantity']}, Demandé: {quantity}")
                     return {
                         'error': f'Stock insuffisant pour le produit {product_id}. '
                                f'Disponible: {inventory_item["available_quantity"]}, '
@@ -214,14 +233,19 @@ class ReservationResource(Resource):
                 })
             
             # Effectuer les réservations
+            app.logger.info(f"[INVENTORY] Application réservations pour {len(reserved_items)} items")
+            
             for reserved_item in reserved_items:
                 product_id = reserved_item['product_id']
                 location_id = reserved_item['location_id']
                 quantity = reserved_item['quantity']
                 
                 inventory_item = get_inventory_item(product_id, location_id)
+                old_available = inventory_item['available_quantity']
                 inventory_item['available_quantity'] -= quantity
                 inventory_item['reserved_quantity'] += quantity
+                
+                app.logger.debug(f"[INVENTORY] Stock réservé - Produit: {product_id}, Quantité: {quantity}, Disponible: {old_available} → {inventory_item['available_quantity']}")
             
             # Créer la réservation
             reservation = {
@@ -236,12 +260,12 @@ class ReservationResource(Resource):
             # Sauvegarder la réservation
             reservations_db[reservation_id] = reservation
             
-            app.logger.info(f"Réservation créée: {reservation_id} - {len(reserved_items)} produits")
+            app.logger.info(f"[INVENTORY] Réservation créée avec succès - ID: {reservation_id}, Items: {len(reserved_items)}, Client: {customer_id}")
             
             return reservation, 201
             
         except Exception as e:
-            app.logger.error(f"Erreur lors de la réservation: {e}")
+            app.logger.error(f"[INVENTORY] Erreur réservation - ID: {reservation_id if 'reservation_id' in locals() else 'N/A'}: {e}")
             return {'error': str(e)}, 500
 
 @api.route('/inventory/release/<string:reservation_id>')
@@ -252,16 +276,21 @@ class ReservationReleaseResource(Resource):
     def delete(self, reservation_id):
         """Libérer une réservation (action de compensation)"""
         try:
+            app.logger.info(f"[INVENTORY] Début libération réservation - ID: {reservation_id}")
+            
             reservation = reservations_db.get(reservation_id)
             
             if not reservation:
+                app.logger.warning(f"[INVENTORY] Réservation non trouvée pour libération - ID: {reservation_id}")
                 return {'error': 'Réservation non trouvée'}, 404
             
             if reservation['status'] == 'released':
-                app.logger.info(f"Réservation {reservation_id} déjà libérée")
+                app.logger.info(f"[INVENTORY] Réservation déjà libérée - ID: {reservation_id}")
                 return {'message': 'Réservation déjà libérée'}, 200
             
             # Libérer les stocks réservés
+            app.logger.debug(f"[INVENTORY] Libération stock pour {len(reservation['items'])} items")
+            
             for item in reservation['items']:
                 product_id = item['product_id']
                 location_id = item['location_id']
@@ -269,14 +298,19 @@ class ReservationReleaseResource(Resource):
                 
                 inventory_item = get_inventory_item(product_id, location_id)
                 if inventory_item:
+                    old_available = inventory_item['available_quantity']
                     inventory_item['available_quantity'] += quantity
                     inventory_item['reserved_quantity'] -= quantity
+                    
+                    app.logger.debug(f"[INVENTORY] Stock libéré - Produit: {product_id}, Quantité: {quantity}, Disponible: {old_available} → {inventory_item['available_quantity']}")
+                else:
+                    app.logger.error(f"[INVENTORY] Item inventaire non trouvé lors libération - Produit: {product_id}")
             
             # Marquer la réservation comme libérée
             reservation['status'] = 'released'
             reservation['released_at'] = datetime.utcnow().isoformat()
             
-            app.logger.info(f"Réservation libérée: {reservation_id}")
+            app.logger.info(f"[INVENTORY] Réservation libérée avec succès - ID: {reservation_id}, Items: {len(reservation['items'])}")
             
             return {
                 'message': 'Réservation libérée avec succès',
@@ -285,7 +319,7 @@ class ReservationReleaseResource(Resource):
             }, 200
             
         except Exception as e:
-            app.logger.error(f"Erreur lors de la libération de la réservation {reservation_id}: {e}")
+            app.logger.error(f"[INVENTORY] Erreur libération réservation {reservation_id}: {e}")
             return {'error': str(e)}, 500
 
 @api.route('/inventory/reservations/<string:reservation_id>')
@@ -297,15 +331,19 @@ class ReservationStatusResource(Resource):
     def get(self, reservation_id):
         """Récupérer les détails d'une réservation"""
         try:
+            app.logger.debug(f"[INVENTORY] Recherche réservation - ID: {reservation_id}")
+            
             reservation = reservations_db.get(reservation_id)
             
             if not reservation:
+                app.logger.warning(f"[INVENTORY] Réservation non trouvée - ID: {reservation_id}")
                 return {'error': 'Réservation non trouvée'}, 404
             
+            app.logger.info(f"[INVENTORY] Réservation récupérée - ID: {reservation_id}, Statut: {reservation['status']}")
             return reservation, 200
             
         except Exception as e:
-            app.logger.error(f"Erreur lors de la récupération de la réservation {reservation_id}: {e}")
+            app.logger.error(f"[INVENTORY] Erreur récupération réservation {reservation_id}: {e}")
             return {'error': str(e)}, 500
 
 @api.route('/inventory/config/failures')
@@ -378,6 +416,7 @@ class InventoryMetricsResource(Resource):
 @app.route('/health')
 def health_check():
     """Endpoint de santé pour le service"""
+    app.logger.debug(f"[INVENTORY] Health check effectué")
     return {
         'status': 'healthy',
         'service': 'inventory-service',
@@ -399,6 +438,8 @@ if __name__ == '__main__':
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    app.logger.info("Inventory Service démarré sur le port 8002")
-    app.logger.info(f"Simulation d'échecs: {failure_config['enabled']}")
+    app.logger.info("[INVENTORY] Service démarré sur le port 8002")
+    app.logger.info(f"[INVENTORY] Simulation d'échecs: {failure_config['enabled']}")
+    app.logger.info(f"[INVENTORY] Taux d'échec: {failure_config['failure_rate']}")
+    app.logger.info(f"[INVENTORY] Produits en rupture simulée: {failure_config['out_of_stock_products']}")
     app.run(host='0.0.0.0', port=8002, debug=os.getenv('DEBUG', 'False').lower() == 'true') 

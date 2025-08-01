@@ -247,6 +247,60 @@ services:
       timeout: 10s
       retries: 3
 
+  # Service de paiement pour saga chorégraphiée
+  refund-payment-service:
+    build:
+      context: ./refund-payment-service
+      dockerfile: Dockerfile
+    container_name: lab7-refund-payment-service
+    environment:
+      - REDIS_URL=redis://:event-streams-secret-2025@redis-streams:6379/0
+      - MONGO_URL=mongodb://event_admin:event_store_password_2025@event-store:27017/event_store?authSource=admin
+      - SECRET_KEY=refund-payment-service-secret-2025
+      - DEBUG=False
+    ports:
+      - "8108:8108"
+    depends_on:
+      redis-streams:
+        condition: service_healthy
+      event-store:
+        condition: service_healthy
+    networks:
+      - event-driven-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8108/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service d'inventaire pour saga chorégraphiée
+  refund-inventory-service:
+    build:
+      context: ./refund-inventory-service
+      dockerfile: Dockerfile
+    container_name: lab7-refund-inventory-service
+    environment:
+      - REDIS_URL=redis://:event-streams-secret-2025@redis-streams:6379/0
+      - MONGO_URL=mongodb://event_admin:event_store_password_2025@event-store:27017/event_store?authSource=admin
+      - SECRET_KEY=refund-inventory-service-secret-2025
+      - DEBUG=False
+    ports:
+      - "8109:8109"
+    depends_on:
+      redis-streams:
+        condition: service_healthy
+      event-store:
+        condition: service_healthy
+    networks:
+      - event-driven-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8109/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # Prometheus pour métriques
   prometheus:
     image: prom/prometheus:latest

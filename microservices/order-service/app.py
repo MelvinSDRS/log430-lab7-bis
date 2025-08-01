@@ -52,6 +52,7 @@ order_status_model = api.model('OrderStatusUpdate', {
 @app.route('/health')
 def health_check():
     """Health check avec informations détaillées - Pattern Customer Service"""
+    app.logger.debug(f"[ORDER] Health check effectué")
     return {
         'status': 'healthy',
         'service': 'order-service',
@@ -78,6 +79,8 @@ class OrdersResource(Resource):
             customer_id = request.args.get('customer_id', type=int)
             status = request.args.get('status')
             
+            app.logger.info(f"[ORDER] Requête liste commandes - Page: {page}, Par page: {per_page}, Client: {customer_id}, Statut: {status}")
+            
             session = get_session()
             order_service = OrderService(session)
             
@@ -88,6 +91,8 @@ class OrdersResource(Resource):
                 status=status
             )
             total_count = order_service.count_orders(customer_id=customer_id, status=status)
+            
+            app.logger.info(f"[ORDER] Commandes récupérées - {len(orders)} commandes sur {total_count} total")
             
             session.close()
             

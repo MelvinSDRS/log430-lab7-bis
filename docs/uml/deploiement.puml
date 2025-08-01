@@ -1,242 +1,221 @@
-@startuml
-title Architecture Distribuée Lab 6 & 7 - Saga Orchestration + Event-Driven
+@startuml deploiement_etape3
+!define RECTANGLE class
 
-' API Gateway Kong - Point d'entrée unique
-node "Kong API Gateway :8080" {
-  component "Kong Gateway" as KONG {
-    component "Routes & Services" as ROUTES
-    component "Authentication" as AUTH
-    component "Rate Limiting" as RATE
-    component "CORS & Security" as CORS
-    component "Load Balancer" as LB
-}
+title Diagramme de Déploiement - Étape 3
+
+node "Client Applications" {
+    artifact "Web Frontend" as WebApp
+    artifact "Mobile App" as MobileApp
+    artifact "Admin Dashboard" as AdminDash
 }
 
-' Microservices Layer
-package "Microservices Layer" {
-  
-  node "Product Service :8001" {
-    component "Product API" as PRODUCT_API
-    database "PostgreSQL\nproduct_db" as PRODUCT_DB
-  }
-  
-  node "Inventory Service :8002" {
-    component "Inventory API" as INVENTORY_API
-    database "PostgreSQL\ninventory_db" as INVENTORY_DB
-  }
-  
-  node "Sales Service :8003" {
-    component "Sales API" as SALES_API
-    database "PostgreSQL\nsales_db" as SALES_DB
-  }
-  
-  node "Reporting Service :8004" {
-    component "Reporting API" as REPORTING_API
-    database "PostgreSQL\nreporting_db" as REPORTING_DB
-  }
-  
-  node "Customer Service :8005" {
-    component "Customer API" as CUSTOMER_API
-    database "PostgreSQL\ncustomer_db" as CUSTOMER_DB
-  }
-  
-  package "Cart Service Cluster (Load Balanced)" {
-    node "Cart Service 1 :8006" {
-      component "Cart API 1" as CART_API_1
-}
-    node "Cart Service 2 :8006" {
-      component "Cart API 2" as CART_API_2
-}
-    node "Cart Service 3 :8006" {
-      component "Cart API 3" as CART_API_3
-}
-    database "Redis\ncart_cache" as CART_CACHE
+node "Load Balancer / API Gateway" {
+    artifact "Kong Gateway" as Kong
+    artifact "Kong Admin API" as KongAdmin
+    database "Kong Database" as KongDB
 }
 
-  node "Order Service :8007" {
-    component "Order API" as ORDER_API
-    database "PostgreSQL\norder_db" as ORDER_DB
-  }
-  
-  node "Saga Orchestrator :8008" {
-    component "Saga Orchestrator API" as SAGA_API
-    component "State Machine" as SAGA_STATE_MACHINE
-    component "Compensation Engine" as COMPENSATION_ENGINE
-  }
-  
-  node "Payment Service :8009" {
-    component "Payment API" as PAYMENT_API
-    database "PostgreSQL\npayment_db" as PAYMENT_DB
-  }
+cloud "Docker Swarm / Kubernetes Cluster" {
+    
+    node "Lab 6 - Saga Orchestrée" {
+        artifact "Saga Orchestrator:8008" as SagaOrch
+        artifact "Payment Service:8009" as PaymentSvc
+        
+        database "Saga State DB:5440" as SagaStateDB
+        database "Payment DB:5441" as PaymentDB
+    }
+
+    node "Lab 7 - Architecture Événementielle" {
+        artifact "Claims Service:8101" as ClaimsSvc
+        artifact "Notification Service:8102" as NotifSvc
+        artifact "Audit Service:8103" as AuditSvc
+        artifact "Projection Service:8104" as ProjSvc
+        artifact "Query Service:8105" as QuerySvc
+        artifact "Event Store Service:8106" as EventStoreSvc
+        artifact "Integration Service:8107" as IntegSvc
+        
+        database "Event Store (MongoDB):27018" as EventStore
+        database "Read Models (PostgreSQL):5439" as ReadModels
+    }
+
+    node "Lab 7 bis - Saga Chorégraphiée" {
+        artifact "Refund Payment Service:8108" as RefundPaySvc
+        artifact "Refund Inventory Service:8109" as RefundInvSvc
+        
+        note bottom of RefundPaySvc : Utilise la même infrastructure\névenementielle que Lab 7
+    }
+
+    node "Services Base (Héritage Étape 2)" {
+        artifact "Product Service:8001" as ProductSvc
+        artifact "Customer Service:8005" as CustomerSvc
+        artifact "Cart Service Instance 1:8006" as CartSvc1
+        artifact "Cart Service Instance 2:8016" as CartSvc2
+        artifact "Cart Service Instance 3:8026" as CartSvc3
+        artifact "Inventory Service:8002" as InvSvc
+        artifact "Sales Service:8003" as SalesSvc
+        artifact "Order Service:8007" as OrderSvc
+        artifact "Reporting Service:8004" as ReportingSvc
+
+        database "Product DB:5433" as ProductDB
+        database "Customer DB:5434" as CustomerDB
+        database "Inventory DB:5435" as InvDB
+        database "Sales DB:5436" as SalesDB
+        database "Order DB:5438" as OrderDB
+        database "Reporting DB:5437" as ReportingDB
+    }
+
+    node "Message Broker" {
+        artifact "Redis Streams:6381" as RedisStreams
+        database "Redis Persistence" as RedisPersist
+    }
+
+    node "Cache Layer" {
+        artifact "Redis Cache:6379" as RedisCache
+    }
+
+    node "Monitoring Stack" {
+        artifact "Prometheus:9091" as Prometheus
+        artifact "Grafana:3001" as Grafana
+        
+        database "Prometheus TSDB" as PromDB
+        database "Grafana DB" as GrafanaDB
+    }
 }
 
-' Monitoring & Observability
-package "Observability Stack" {
-  node "Grafana :3000" {
-    component "Dashboards" as GRAFANA
-  }
-  
-  node "Prometheus :9090" {
-    component "Metrics Collection" as PROMETHEUS
-  }
+node "External Services" {
+    cloud "Payment Gateway" as PaymentGW
+    cloud "Email Service" as EmailSvc
+    cloud "SMS Service" as SMSSvc
 }
 
-' Lab 7 Event-Driven Architecture
-package "Event-Driven Layer (Lab 7)" {
-  
-  node "Claims Service :8101" {
-    component "Claims API" as CLAIMS_API
-  }
-  
-  node "Notification Service :8102" {
-    component "Notification Consumer" as NOTIFICATION_CONSUMER
-  }
-  
-  node "Audit Service :8103" {
-    component "Audit Consumer" as AUDIT_CONSUMER
-  }
-  
-  node "Integration Service :8107" {
-    component "Integration Bridge" as INTEGRATION_BRIDGE
-  }
-  
-  node "Event Infrastructure" {
-    database "Redis Streams\n:6381" as REDIS_STREAMS
-    database "MongoDB\nEvent Store :27018" as EVENT_STORE
-    database "PostgreSQL\nRead Models :5439" as READ_MODELS
-  }
-  
-  node "Event Monitoring :9091" {
-    component "Prometheus Events" as PROMETHEUS_EVENTS
-    component "Grafana Lab 7 :3001" as GRAFANA_LAB7
-  }
-}
+' Connexions clients
+WebApp --> Kong : HTTPS:8080
+MobileApp --> Kong : HTTPS:8080
+AdminDash --> Kong : HTTPS:8080
 
-' Client Applications
-package "Client Applications" {
-  actor "E-commerce Web" as WEB_CLIENT
-  actor "Mobile App" as MOBILE_CLIENT
-  actor "POS Terminals" as POS_CLIENT
-  actor "Admin Dashboard" as ADMIN_CLIENT
-}
+Kong --> KongDB
 
-' Kong Gateway connections to microservices
-KONG --> PRODUCT_API : "/api/v1/products"
-KONG --> INVENTORY_API : "/api/v1/inventory"
-KONG --> SALES_API : "/api/v1/sales"
-KONG --> REPORTING_API : "/api/v1/reports"
-KONG --> CUSTOMER_API : "/api/v1/customers"
-KONG --> CART_API_1 : "/api/v1/cart"
-KONG --> CART_API_2 : "/api/v1/cart"
-KONG --> CART_API_3 : "/api/v1/cart"
-KONG --> ORDER_API : "/api/v1/orders"
-KONG --> SAGA_API : "/api/v1/sagas"
-KONG --> PAYMENT_API : "/api/v1/payment"
+' Lab 6 - Connexions synchrones via Kong
+Kong --> SagaOrch : HTTP
+Kong --> PaymentSvc : HTTP
+Kong --> CartSvc1 : HTTP (LB)
+Kong --> CartSvc2 : HTTP (LB)
+Kong --> CartSvc3 : HTTP (LB)
+Kong --> InvSvc : HTTP
+Kong --> OrderSvc : HTTP
 
-' Database connections
-PRODUCT_API --> PRODUCT_DB
-INVENTORY_API --> INVENTORY_DB
-SALES_API --> SALES_DB
-REPORTING_API --> REPORTING_DB
-CUSTOMER_API --> CUSTOMER_DB
-CART_API_1 --> CART_CACHE
-CART_API_2 --> CART_CACHE
-CART_API_3 --> CART_CACHE
-ORDER_API --> ORDER_DB
-PAYMENT_API --> PAYMENT_DB
-SAGA_API *-- SAGA_STATE_MACHINE
-SAGA_API *-- COMPENSATION_ENGINE
+SagaOrch --> SagaStateDB
+PaymentSvc --> PaymentDB
+PaymentSvc --> PaymentGW : HTTPS
 
-' Inter-service communication
-SALES_API ..> INVENTORY_API : "Stock validation"
-SALES_API ..> PRODUCT_API : "Product info"
-REPORTING_API ..> SALES_API : "Sales data"
-REPORTING_API ..> INVENTORY_API : "Stock data"
-ORDER_API ..> CART_API_1 : "Cart checkout"
-ORDER_API ..> INVENTORY_API : "Stock reservation"
-ORDER_API ..> CUSTOMER_API : "Customer validation"
+' Lab 7 - Connexions asynchrones via événements
+ClaimsSvc --> RedisStreams : Pub/Sub
+NotifSvc --> RedisStreams : Pub/Sub
+AuditSvc --> RedisStreams : Pub/Sub
+ProjSvc --> RedisStreams : Pub/Sub
 
-' Saga Orchestration communication
-SAGA_API ..> CART_API_1 : "Cart validation"
-SAGA_API ..> INVENTORY_API : "Stock reservation"
-SAGA_API ..> PAYMENT_API : "Payment processing"
-SAGA_API ..> ORDER_API : "Order confirmation"
+ClaimsSvc --> EventStore
+EventStoreSvc --> EventStore
+ProjSvc --> ReadModels
+QuerySvc --> ReadModels
 
-' Lab 7 Event-Driven communication
-CLAIMS_API --> REDIS_STREAMS : "Publish events"
-CLAIMS_API --> EVENT_STORE : "Store events"
-REDIS_STREAMS --> NOTIFICATION_CONSUMER : "Event stream"
-REDIS_STREAMS --> AUDIT_CONSUMER : "Event stream"
-INTEGRATION_BRIDGE ..> ORDER_API : "Fetch order context"
-INTEGRATION_BRIDGE ..> CUSTOMER_API : "Fetch customer context"
+NotifSvc --> EmailSvc : HTTPS
+NotifSvc --> SMSSvc : HTTPS
 
-' Client connections
-WEB_CLIENT --> KONG : "HTTPS"
-MOBILE_CLIENT --> KONG : "HTTPS"
-POS_CLIENT --> KONG : "API Key Auth"
-ADMIN_CLIENT --> KONG : "JWT Auth"
+' Lab 7 bis - Connexions asynchrones décentralisées
+RefundPaySvc --> RedisStreams : Pub/Sub
+RefundInvSvc --> RedisStreams : Pub/Sub
 
-' Monitoring connections
-PRODUCT_API ..> PROMETHEUS : "metrics"
-INVENTORY_API ..> PROMETHEUS : "metrics"
-SALES_API ..> PROMETHEUS : "metrics"
-REPORTING_API ..> PROMETHEUS : "metrics"
-CUSTOMER_API ..> PROMETHEUS : "metrics"
-CART_API_1 ..> PROMETHEUS : "metrics"
-ORDER_API ..> PROMETHEUS : "metrics"
-SAGA_API ..> PROMETHEUS : "saga metrics"
-PAYMENT_API ..> PROMETHEUS : "payment metrics"
-CLAIMS_API ..> PROMETHEUS_EVENTS : "event metrics"
-NOTIFICATION_CONSUMER ..> PROMETHEUS_EVENTS : "notification metrics"
-AUDIT_CONSUMER ..> PROMETHEUS_EVENTS : "audit metrics"
-PROMETHEUS --> GRAFANA : "visualization"
-PROMETHEUS_EVENTS --> GRAFANA_LAB7 : "event visualization"
+' Intégration Lab 6 ↔ Lab 7
+IntegSvc --> Kong : HTTP (Read Lab 6)
 
-note bottom of KONG
-  Kong Gateway Features:
-  - API Key & JWT Authentication
-  - Rate Limiting (100/min, 1000/hour)
-  - CORS Configuration
-  - Load Balancing (Cart Service)
-  - Request/Response Transformation
-  - Health Checks & Circuit Breaker
+' Services base via Kong
+Kong --> ProductSvc : HTTP
+Kong --> CustomerSvc : HTTP
+Kong --> SalesSvc : HTTP
+Kong --> ReportingSvc : HTTP
+
+' Connexions base de données
+ProductSvc --> ProductDB
+CustomerSvc --> CustomerDB
+InvSvc --> InvDB
+SalesSvc --> SalesDB
+OrderSvc --> OrderDB
+ReportingSvc --> ReportingDB
+
+' Cache
+CartSvc1 --> RedisCache
+CartSvc2 --> RedisCache
+CartSvc3 --> RedisCache
+
+' Persistence Redis Streams
+RedisStreams --> RedisPersist
+
+' Monitoring
+SagaOrch --> Prometheus : Metrics
+ClaimsSvc --> Prometheus : Metrics
+RefundPaySvc --> Prometheus : Metrics
+RefundInvSvc --> Prometheus : Metrics
+ProductSvc --> Prometheus : Metrics
+CustomerSvc --> Prometheus : Metrics
+CartSvc1 --> Prometheus : Metrics
+CartSvc2 --> Prometheus : Metrics
+CartSvc3 --> Prometheus : Metrics
+
+Prometheus --> PromDB
+Grafana --> Prometheus : Query
+Grafana --> GrafanaDB
+
+' Monitoring des dashboards
+AdminDash --> Grafana : HTTPS:3001
+AdminDash --> Prometheus : HTTPS:9091
+
+' Configuration réseau
+note top of Kong : Point d'entrée unique\nLoad Balancing\nAPI Keys + JWT\nRate Limiting
+
+note top of RedisStreams : Message Broker central\nConsumer Groups\nEvent Persistence\nStream Replay
+
+note bottom of EventStore : Event Sourcing\nImmutable Events\nProjection Replay\nAudit Trail
+
+note as NetworkConfig
+**Configuration Réseau**
+
+**Ports externes exposés:**
+• Kong Gateway: 8080 (HTTPS)
+• Kong Admin: 8001
+• Grafana: 3001
+• Prometheus: 9091
+
+**Communication interne:**
+• Services: HTTP REST
+• Événements: Redis Streams
+• Monitoring: Prometheus Pull
+
+**Sécurité:**
+• TLS entre services
+• API Keys Kong
+• JWT pour Customer/Order
+• Network policies
 end note
 
-note bottom of "Cart Service Cluster (Load Balanced)"
-  Load Balancing Strategy:
-  - Algorithm: least-connections
-  - Health Checks: /health every 15s
-  - Auto failover on unhealthy instances
-  - Session stickiness via Redis
-end note
+note as DeploymentStrategy
+**Stratégie de Déploiement**
 
-note bottom of "Microservices Layer"
-  Database per Service Pattern:
-  - 9 PostgreSQL databases (isolated)
-  - 1 Redis cache (shared by Cart instances)
-  - In-memory saga state management
-  - No direct database access between services
-  - Saga orchestration for distributed transactions
-end note
+**Lab 6:** Docker Compose
+Services synchrones
+État centralisé
 
-note right of "Saga Orchestrator :8008"
-  Saga Orchestrator Features:
-  - Synchronous orchestration pattern
-  - State machine coordination
-  - Automatic compensation on failures
-  - Prometheus metrics integration
-  - Timeout and retry mechanisms
-  - In-memory state persistence
-end note
+**Lab 7:** Docker Compose
+Services asynchrones
+Event Store persistant
 
-note left of "Event-Driven Layer (Lab 7)"
-  Event-Driven Architecture Features:
-  - Event Sourcing with MongoDB persistence
-  - CQRS with separate read/write models
-  - Redis Streams for Pub/Sub messaging
-  - Decoupled event consumers
-  - Integration bridge with Lab 6
-  - Separate monitoring stack
+**Lab 7 bis:** Extension Lab 7
+Services chorégraphiés
+Pas d'état central
+
+**Production:** Kubernetes
+Auto-scaling
+Service Mesh
 end note
 
 @enduml

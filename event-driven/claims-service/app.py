@@ -338,6 +338,56 @@ class ClaimCloseResource(Resource):
         
         return {"message": "Claim closed successfully"}
 
+@api.route('/claims/<string:claim_id>/refund')
+class ClaimRefundResource(Resource):
+    @api.doc('initiate_refund')
+    def post(self, claim_id):
+        """Initier un remboursement (saga chorégraphiée)"""
+        claim = claims_store.get(claim_id)
+        if not claim:
+            return {"error": "Claim not found"}, 404
+        
+        if claim.status != ClaimStatus.RESOLVED:
+            return {"error": "Claim must be resolved before refund"}, 400
+        
+        # Démarrer la saga de remboursement
+        correlation_id = request.headers.get('X-Correlation-ID', str(uuid.uuid4()))
+        
+        # Publier l'événement de démarrage de saga
+        saga_data = {
+            "claim_id": claim_id,
+            "customer_id": claim.customer_id,
+            "product_id": claim.product_id,
+            "claim_type": claim.claim_type.value,
+            "description": claim.description,
+            "saga_initiated_at": datetime.utcnow().isoformat(),
+            "saga_step": "saga_initiated"
+        }
+        
+        event_publisher.publish_event(
+            event_type='SagaRemboursementDemarree',
+            aggregate_id=claim_id,
+            data=saga_data,
+            correlation_id=correlation_id
+        )
+        
+        # Métriques
+        EVENTS_PUBLISHED.labels(event_type='SagaRemboursementDemarree').inc()
+        
+        logger.info(
+            "Refund saga initiated",
+            claim_id=claim_id,
+            customer_id=claim.customer_id,
+            product_id=claim.product_id,
+            correlation_id=correlation_id
+        )
+        
+        return {
+            "message": "Refund saga initiated successfully",
+            "claim_id": claim_id,
+            "correlation_id": correlation_id
+        }
+
 @api.route('/claims/<string:claim_id>/events')
 class ClaimEventsResource(Resource):
     @api.doc('get_claim_events')

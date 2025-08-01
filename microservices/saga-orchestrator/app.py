@@ -37,9 +37,10 @@ if TEST_MODE:
     # Mode test : communication directe avec les services
     DIRECT_SERVICES_URL = 'http://localhost'
     orchestrator = SagaOrchestrator(DIRECT_SERVICES_URL)
-    app.logger.info("Mode TEST activé - Communication directe avec services")
+    app.logger.info("[SAGA] Mode TEST activé - Communication directe avec services")
 else:
     orchestrator = SagaOrchestrator(GATEWAY_URL)
+    app.logger.info(f"[SAGA] Mode PRODUCTION - Gateway URL: {GATEWAY_URL}")
 
 # Métriques Prometheus pour surveillance des sagas
 metrics = PrometheusMetrics(app, path=None)
@@ -150,6 +151,7 @@ class OrderSagaResource(Resource):
             start_time = datetime.utcnow()
             
             # Démarrer la saga
+            app.logger.info(f"[SAGA] Démarrage saga commande - Session: {session_id}, Client: {customer_id}")
             saga = orchestrator.start_order_saga(session_id, customer_id, data)
             
             # Mettre à jour les métriques
@@ -206,12 +208,15 @@ class OrderSagaResource(Resource):
             
             status_code = 201 if saga.status == SagaStatus.COMPLETED else 202
             
-            app.logger.info(f"Saga {saga.saga_id} créée avec statut {saga.status.value}")
+            app.logger.info(f"[SAGA] Saga créée - ID: {saga.saga_id}, Statut: {saga.status.value}, Durée: {saga.total_duration_ms}ms")
+            if saga.failed_step:
+                app.logger.warning(f"[SAGA] Saga échouée - ID: {saga.saga_id}, Étape: {saga.failed_step.step_type.value}, Erreur: {saga.failed_step.error}")
+            app.logger.info(f"[SAGA] Résumé - Étapes complétées: {len(saga.completed_steps)}, Compensations: {len(saga.compensation_steps)}")
             
             return response_data, status_code
             
         except Exception as e:
-            app.logger.error(f"Erreur lors de la création de saga: {e}")
+            app.logger.error(f"[SAGA] Erreur création saga - Session: {session_id if 'session_id' in locals() else 'N/A'}: {e}")
             return {'error': str(e)}, 500
 
 @api.route('/sagas/<string:saga_id>')
@@ -223,10 +228,15 @@ class SagaStatusResource(Resource):
     def get(self, saga_id):
         """Récupérer l'état actuel d'une saga"""
         try:
+            app.logger.debug(f"[SAGA] Recherche statut saga - ID: {saga_id}")
+            
             saga = orchestrator.get_saga_status(saga_id)
             
             if not saga:
+                app.logger.warning(f"[SAGA] Saga non trouvée - ID: {saga_id}")
                 return {'error': 'Saga non trouvée'}, 404
+            
+            app.logger.info(f"[SAGA] Statut saga récupéré - ID: {saga_id}, Statut: {saga.status.value}")
             
             response_data = {
                 'saga_id': saga.saga_id,

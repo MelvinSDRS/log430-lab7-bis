@@ -1,474 +1,331 @@
-@startuml
-' Microservices Architecture - Lab 5 Domain Model
+@startuml classes_etape3
+!define RECTANGLE class
 
-' Product Service Bounded Context
-package "Product Service" {
-  class Product {
-    +id: UUID
-    +name: string
-    +description: string
-    +price: Decimal
-    +category_id: UUID
-    +sku: string
-    +active: boolean
-    +created_at: datetime
-    +updated_at: datetime
-    +validate(): bool
-    +to_dict(): dict
-}
+title Diagramme de Classes - Étape 3 (Labs 6, 7, 7 bis)
 
-  class Category {
-    +id: UUID
-    +name: string
-    +description: string
-    +parent_id: UUID
-    +active: boolean
-    +get_subcategories(): Category[]
-}
-
-  class ProductService {
-    +create_product(data): Product
-    +get_product(id): Product
-    +update_product(id, data): Product
-    +delete_product(id): bool
-    +search_products(query): Product[]
-    +get_products_by_category(category_id): Product[]
-  }
-}
-
-' Customer Service Bounded Context
-package "Customer Service" {
-  class Customer {
-    +id: UUID
-    +email: string
-    +first_name: string
-    +last_name: string
-    +phone: string
-    +created_at: datetime
-    +is_active: boolean
-    +authenticate(password): bool
-    +get_full_name(): string
-}
-
-  class Address {
-    +id: UUID
-    +customer_id: UUID
-    +type: AddressType
-    +street: string
-    +city: string
-    +postal_code: string
-    +province: string
-    +country: string
-    +is_default: boolean
-  }
-
-  enum AddressType {
-    BILLING
-    SHIPPING
-}
-
-  class CustomerService {
-    +register_customer(data): Customer
-    +authenticate(email, password): Customer
-    +update_profile(id, data): Customer
-    +add_address(customer_id, address): Address
-    +get_customer_addresses(customer_id): Address[]
-  }
-}
-
-' Cart Service Bounded Context
-package "Cart Service" {
-  class Cart {
-    +session_id: string
-    +customer_id: UUID
-    +items: CartItem[]
-    +created_at: datetime
-    +expires_at: datetime
-    +add_item(product_id, quantity): void
-    +remove_item(product_id): void
-    +update_quantity(product_id, quantity): void
-    +clear(): void
-    +calculate_total(): Decimal
-    +calculate_taxes(): Decimal
-}
-
-  class CartItem {
-    +product_id: UUID
-    +quantity: int
-    +unit_price: Decimal
-    +subtotal(): Decimal
-  }
-
-  class CartService {
-    +get_cart(session_id): Cart
-    +add_to_cart(session_id, product_id, quantity): Cart
-    +update_cart_item(session_id, product_id, quantity): Cart
-    +remove_from_cart(session_id, product_id): Cart
-    +clear_cart(session_id): void
-    +calculate_taxes(cart): TaxCalculation
-}
-
-  class TaxCalculation {
-    +gst: Decimal
-    +qst: Decimal
-    +total_tax: Decimal
-    +total_with_tax: Decimal
-  }
-}
-
-' Order Service Bounded Context
-package "Order Service" {
-  class Order {
-    +id: UUID
-    +customer_id: UUID
-    +order_number: string
-    +status: OrderStatus
-    +items: OrderItem[]
-    +shipping_address: Address
-    +billing_address: Address
-    +subtotal: Decimal
-    +tax_amount: Decimal
-    +total_amount: Decimal
-    +created_at: datetime
-    +update_status(status): void
-    +add_item(product_id, quantity, price): void
-}
-
-  class OrderItem {
-    +id: UUID
-    +order_id: UUID
-    +product_id: UUID
-    +quantity: int
-    +unit_price: Decimal
-    +total_price: Decimal
-  }
-
-  enum OrderStatus {
-    PENDING
-    CONFIRMED
-    PROCESSING
-    SHIPPED
-    DELIVERED
-    CANCELLED
-  }
-
-  class OrderService {
-    +create_order(customer_id, cart_data): Order
-    +get_order(id): Order
-    +update_order_status(id, status): Order
-    +get_customer_orders(customer_id): Order[]
-    +process_checkout(checkout_data): Order
-  }
-}
-
-' Inventory Service Bounded Context
-package "Inventory Service" {
-  class Stock {
-    +id: UUID
-    +product_id: UUID
-    +location_type: LocationType
-    +location_id: string
-    +quantity: int
-    +reserved_quantity: int
-    +min_threshold: int
-    +max_threshold: int
-    +last_updated: datetime
-    +available_quantity(): int
-    +is_low_stock(): bool
-    +reserve_stock(quantity): bool
-    +release_stock(quantity): void
-  }
-
-  enum LocationType {
-    STORE
-    WAREHOUSE
-    ECOMMERCE
-  }
-  
-  class StockMovement {
-    +id: UUID
-    +stock_id: UUID
-    +movement_type: MovementType
-    +quantity: int
-    +reference_id: UUID
-    +reference_type: string
-    +created_at: datetime
-    +notes: string
-  }
-
-  enum MovementType {
-    IN
-    OUT
-    TRANSFER
-    ADJUSTMENT
-    RESERVATION
-    RELEASE
-  }
-
-  class InventoryService {
-    +get_stock(product_id, location): Stock
-    +update_stock(product_id, location, quantity): Stock
-    +reserve_stock(product_id, quantity, location): bool
-    +release_stock(product_id, quantity, location): void
-    +transfer_stock(from_location, to_location, product_id, quantity): void
-    +get_low_stock_alerts(): Stock[]
-    +record_movement(stock_id, type, quantity, reference): StockMovement
-  }
-}
-
-' Sales Service Bounded Context (POS)
-package "Sales Service" {
-  class Sale {
-    +id: UUID
-    +store_id: string
-    +cashier_id: string
-    +items: SaleItem[]
-    +payment_method: PaymentMethod
-    +subtotal: Decimal
-    +tax_amount: Decimal
-    +total_amount: Decimal
-    +timestamp: datetime
-    +receipt_number: string
-    +add_item(product_id, quantity, price): void
-    +calculate_total(): Decimal
-  }
-
-  class SaleItem {
-    +id: UUID
-    +sale_id: UUID
-    +product_id: UUID
-    +quantity: int
-    +unit_price: Decimal
-    +discount: Decimal
-    +total_price: Decimal
-  }
-
-  enum PaymentMethod {
-    CASH
-    CREDIT_CARD
-    DEBIT_CARD
-    MOBILE_PAYMENT
-  }
-
-  class Return {
-    +id: UUID
-    +original_sale_id: UUID
-    +items: ReturnItem[]
-    +reason: string
-    +total_refund: Decimal
-    +processed_at: datetime
-    +processed_by: string
-  }
-
-  class ReturnItem {
-    +id: UUID
-    +return_id: UUID
-    +product_id: UUID
-    +quantity: int
-    +refund_amount: Decimal
-  }
-
-  class SalesService {
-    +create_sale(store_id, cashier_id): Sale
-    +add_sale_item(sale_id, product_id, quantity): Sale
-    +process_payment(sale_id, payment_method): Sale
-    +process_return(sale_id, items, reason): Return
-    +get_daily_sales(store_id, date): Sale[]
-  }
+package "Lab 6 - Saga Orchestrée" {
+    class SagaOrchestrator {
+        +saga_id: UUID
+        +customer_id: string
+        +status: SagaStatus
+        +created_at: datetime
+        +updated_at: datetime
+        +timeout: int
+        --
+        +execute_saga(request: SagaRequest): SagaResult
+        +compensate(failed_step: string): void
+        +get_status(): SagaStatus
+        +update_state(new_state: SagaStatus): void
+        +handle_timeout(): void
     }
-    
-' Reporting Service Bounded Context
-package "Reporting Service" {
-  class SalesReport {
-    +report_id: UUID
-    +period_start: datetime
-    +period_end: datetime
-    +total_sales: Decimal
-    +total_transactions: int
-    +top_products: ProductSalesData[]
-    +sales_by_store: StoreSalesData[]
-    +generated_at: datetime
+
+    enum SagaStatus {
+        PENDING
+        CART_VALIDATED
+        STOCK_RESERVED
+        PAYMENT_PROCESSED
+        ORDER_CONFIRMED
+        COMPLETED
+        CART_VALIDATION_FAILED
+        STOCK_RESERVATION_FAILED
+        PAYMENT_FAILED
+        COMPENSATING_STOCK
+        COMPENSATING_PAYMENT
+        COMPENSATED
+        FAILED
     }
-    
-  class ProductSalesData {
-    +product_id: UUID
-    +product_name: string
-    +quantity_sold: int
-    +revenue: Decimal
-    +rank: int
-  }
 
-  class StoreSalesData {
-    +store_id: string
-    +store_name: string
-    +total_sales: Decimal
-    +transaction_count: int
-    +average_transaction: Decimal
-  }
+    class SagaStateMachine {
+        +current_state: SagaStatus
+        +transitions: dict
+        --
+        +transition(event: string): SagaStatus
+        +can_transition(event: string): boolean
+        +get_next_steps(): list
+    }
 
-  class DashboardMetrics {
-    +total_revenue_today: Decimal
-    +total_orders_today: int
-    +top_selling_products: ProductSalesData[]
-    +low_stock_alerts: int
-    +active_customers: int
-    +conversion_rate: Decimal
-  }
+    class CompensationManager {
+        +compensation_actions: dict
+        --
+        +compensate_step(step: string, saga_id: UUID): void
+        +register_compensation(step: string, action: callable): void
+        +rollback_saga(saga_id: UUID, failed_step: string): void
+    }
 
-  class ReportingService {
-    +generate_sales_report(start_date, end_date): SalesReport
-    +get_dashboard_metrics(): DashboardMetrics
-    +get_product_performance(product_id, period): ProductSalesData
-    +get_store_comparison(period): StoreSalesData[]
-    +export_report(report_id, format): file
-  }
+    class PaymentService {
+        +payment_gateway_url: string
+        +failure_rate: float
+        --
+        +process_payment(amount: decimal, method: string): PaymentResult
+        +refund_payment(transaction_id: string): RefundResult
+        +simulate_failure(): boolean
+    }
+
+    class SagaRequest {
+        +customer_id: string
+        +cart_id: string
+        +payment_method: string
+        +amount: decimal
+        +items: list
+    }
+
+    class SagaResult {
+        +saga_id: UUID
+        +status: SagaStatus
+        +order_id: string
+        +error_message: string
+    }
 }
 
-' Kong API Gateway Configuration
-package "Kong Gateway" {
-  class Service {
-    +name: string
-    +url: string
-    +protocol: string
-    +host: string
-    +port: int
-    +path: string
-  }
+package "Lab 7 - Architecture Événementielle" {
+    class EventStore {
+        +events: list
+        +snapshots: dict
+        --
+        +append_event(event: Event): void
+        +get_events(aggregate_id: UUID): list
+        +get_events_since(timestamp: datetime): list
+        +replay_events(aggregate_id: UUID): AggregateState
+        +create_snapshot(aggregate_id: UUID, state: dict): void
+    }
 
-  class Route {
-    +name: string
-    +service: Service
-    +paths: string[]
-    +methods: string[]
-    +strip_path: boolean
-  }
+    class Event {
+        +event_id: UUID
+        +event_type: string
+        +aggregate_id: UUID
+        +data: dict
+        +timestamp: datetime
+        +correlation_id: UUID
+        +version: int
+    }
 
-  class Consumer {
-    +username: string
-    +custom_id: string
-    +tags: string[]
-  }
+    class EventPublisher {
+        +redis_streams: RedisStreams
+        +mongo_client: MongoClient
+        --
+        +publish_event(event_type: string, data: dict): void
+        +publish_to_stream(stream: string, event: Event): void
+    }
 
-  class Plugin {
-    +name: string
-    +config: dict
-    +enabled: boolean
-  }
+    class EventConsumer {
+        +consumer_group: string
+        +consumer_name: string
+        +event_handlers: dict
+        --
+        +register_handler(event_type: string, handler: callable): void
+        +start_consuming(streams: list): void
+        +process_message(message: dict): void
+        +acknowledge_message(stream: string, msg_id: string): void
+    }
 
-  class Upstream {
-    +name: string
-    +algorithm: string
-    +targets: Target[]
-  }
+    class ClaimsService {
+        +claims_store: dict
+        --
+        +create_claim(claim_data: dict): Claim
+        +assign_to_agent(claim_id: UUID, agent_id: string): void
+        +start_processing(claim_id: UUID): void
+        +resolve_claim(claim_id: UUID, resolution: string): void
+        +close_claim(claim_id: UUID): void
+    }
 
-  class Target {
-    +target: string
-    +weight: int
-    +upstream: Upstream
-  }
+    class Claim {
+        +claim_id: UUID
+        +customer_id: string
+        +claim_type: ClaimType
+        +description: string
+        +product_id: string
+        +status: ClaimStatus
+        +assigned_agent: string
+        +created_at: datetime
+        +resolved_at: datetime
+        --
+        +assign_to_agent(agent_id: string): void
+        +start_processing(): void
+        +resolve(resolution: string): void
+        +close(): void
+        +to_dict(): dict
+    }
+
+    enum ClaimType {
+        PRODUCT_DEFECT
+        DELIVERY_ISSUE
+        BILLING_ERROR
+        SERVICE_COMPLAINT
+    }
+
+    enum ClaimStatus {
+        CREATED
+        ASSIGNED
+        IN_PROGRESS
+        RESOLVED
+        CLOSED
+    }
+
+    class ProjectionService {
+        +read_models: dict
+        --
+        +update_projection(event: Event): void
+        +handle_claim_created(event_data: dict): void
+        +handle_claim_assigned(event_data: dict): void
+        +handle_claim_resolved(event_data: dict): void
+    }
+
+    class QueryService {
+        +postgres_client: PostgresClient
+        --
+        +get_claims(filters: dict): list
+        +get_claim_statistics(): dict
+        +search_claims(query: string): list
+        +get_dashboard_data(): dict
+    }
+
+    class NotificationService {
+        +notification_handlers: dict
+        --
+        +send_email(recipient: string, subject: string, body: string): void
+        +send_sms(phone: string, message: string): void
+        +handle_claim_created(event_data: dict): void
+        +handle_claim_resolved(event_data: dict): void
+    }
+
+    class AuditService {
+        +audit_trail: list
+        --
+        +log_event(event: Event): void
+        +create_audit_entry(event_data: dict): void
+        +get_audit_trail(filters: dict): list
+    }
 }
 
-' Relations between services
-Product ||--o{ Category : "belongs to"
-Customer ||--o{ Address : "has many"
-Cart ||--o{ CartItem : "contains"
-Order ||--o{ OrderItem : "contains"
-Stock ||--o{ StockMovement : "tracks"
-Sale ||--o{ SaleItem : "contains"
-Return ||--o{ ReturnItem : "contains"
+package "Lab 7 bis - Saga Chorégraphiée" {
+    class RefundPaymentService {
+        +processing_sagas: dict
+        +refund_calculator: RefundCalculator
+        --
+        +handle_saga_started(event_data: dict): void
+        +calculate_refund(product_id: string, claim_type: string): decimal
+        +compensate_refund(correlation_id: UUID): void
+        +ensure_idempotence(correlation_id: UUID): boolean
+    }
 
-' Service relations
-ProductService --> Product
-CustomerService --> Customer
-CartService --> Cart
-OrderService --> Order
-InventoryService --> Stock
-SalesService --> Sale
-ReportingService --> SalesReport
+    class RefundInventoryService {
+        +processing_sagas: dict
+        +inventory_manager: InventoryManager
+        --
+        +handle_refund_calculated(event_data: dict): void
+        +adjust_stock(product_id: string, quantity: int): dict
+        +compensate_stock_adjustment(correlation_id: UUID): void
+        +ensure_idempotence(correlation_id: UUID): boolean
+    }
 
-' Kong Gateway relations
-Service ||--o{ Route : "has routes"
-Consumer ||--o{ Plugin : "has plugins"
-Upstream ||--o{ Target : "load balances"
-Route ||--o{ Plugin : "applies plugins"
+    class RefundCalculator {
+        +refund_policies: dict
+        --
+        +calculate_refund(product_id: string, claim_type: string): decimal
+        +get_base_price(product_id: string): decimal
+        +apply_refund_policy(claim_type: string, base_price: decimal): decimal
+    }
 
-' Cross-service relationships (via API calls)
-CartItem ..> Product : "references"
-OrderItem ..> Product : "references"
-SaleItem ..> Product : "references"
-Stock ..> Product : "tracks inventory for"
+    class InventoryManager {
+        +stock_levels: dict
+        --
+        +get_stock_level(product_id: string): int
+        +adjust_stock(product_id: string, quantity_change: int): dict
+        +get_all_stock_levels(): dict
+    }
 
-note top of "Product Service"
-  Port: 8001
-  Database: product_db (PostgreSQL)
-  Responsibilities:
-  - Product catalog management
-  - Category hierarchy
-  - Product search and filtering
-end note
+    class ChoreographyCoordinator {
+        +saga_events: dict
+        --
+        +track_saga_progress(correlation_id: UUID, event_type: string): void
+        +check_saga_completion(correlation_id: UUID): boolean
+        +handle_saga_failure(correlation_id: UUID): void
+    }
+}
 
-note top of "Customer Service"
-  Port: 8005
-  Database: customer_db (PostgreSQL)
-  Responsibilities:
-  - Customer registration/authentication
-  - Profile management
-  - Address management
-end note
+package "Infrastructure Commune" {
+    class RedisStreams {
+        +connection: Redis
+        --
+        +publish_to_stream(stream: string, data: dict): void
+        +create_consumer_group(stream: string, group: string): void
+        +read_from_group(group: string, consumer: string): list
+        +acknowledge_message(stream: string, group: string, msg_id: string): void
+    }
 
-note top of "Cart Service"
-  Port: 8006 (Load Balanced)
-  Database: Redis cache
-  Responsibilities:
-  - Shopping cart sessions
-  - Tax calculations
-  - Cart persistence
-end note
+    class MongoEventStore {
+        +client: MongoClient
+        +database: string
+        +collection: string
+        --
+        +store_event(event: Event): void
+        +get_events_by_aggregate(aggregate_id: UUID): list
+        +get_events_by_type(event_type: string): list
+        +get_events_since(timestamp: datetime): list
+    }
 
-note top of "Order Service"
-  Port: 8007
-  Database: order_db (PostgreSQL)
-  Responsibilities:
-  - Order lifecycle management
-  - Checkout processing
-  - Order tracking
-end note
+    class PrometheusMetrics {
+        +counters: dict
+        +histograms: dict
+        +gauges: dict
+        --
+        +increment_counter(name: string, labels: dict): void
+        +observe_histogram(name: string, value: float, labels: dict): void
+        +set_gauge(name: string, value: float, labels: dict): void
+        +generate_metrics(): string
+    }
 
-note top of "Inventory Service"
-  Port: 8002
-  Database: inventory_db (PostgreSQL)
-  Responsibilities:
-  - Stock management
-  - Multi-location inventory
-  - Stock reservations
-end note
+    class KongGateway {
+        +services: list
+        +routes: list
+        +plugins: list
+        --
+        +register_service(service: ServiceConfig): void
+        +create_route(route: RouteConfig): void
+        +apply_plugin(plugin: PluginConfig): void
+        +load_balance_request(request: Request): Response
+    }
+}
 
-note top of "Sales Service"
-  Port: 8003
-  Database: sales_db (PostgreSQL)
-  Responsibilities:
-  - POS transactions
-  - In-store sales
-  - Returns processing
-end note
+' Relations Lab 6
+SagaOrchestrator ||--o{ SagaStateMachine
+SagaOrchestrator ||--o{ CompensationManager
+SagaOrchestrator --> PaymentService
+SagaOrchestrator ..> SagaRequest
+SagaOrchestrator ..> SagaResult
+SagaOrchestrator --> SagaStatus
 
-note top of "Reporting Service"
-  Port: 8004
-  Database: reporting_db (PostgreSQL)
-  Responsibilities:
-  - Analytics and reporting
-  - Dashboard metrics
-  - Performance tracking
-end note
+' Relations Lab 7
+ClaimsService ||--o{ Claim
+Claim --> ClaimType
+Claim --> ClaimStatus
+EventStore ||--o{ Event
+EventPublisher --> RedisStreams
+EventPublisher --> MongoEventStore
+EventConsumer --> RedisStreams
+ProjectionService --> Event
+NotificationService --> EventConsumer
+AuditService --> EventConsumer
 
-note bottom of "Kong Gateway"
-  Port: 8080
-  Features:
-  - API Gateway and load balancer
-  - Authentication (API Key + JWT)
-  - Rate limiting and CORS
-  - Service discovery and routing
-  - Health checks and monitoring
-end note
+' Relations Lab 7 bis
+RefundPaymentService --> RefundCalculator
+RefundInventoryService --> InventoryManager
+RefundPaymentService --> EventConsumer
+RefundInventoryService --> EventConsumer
+ChoreographyCoordinator --> RedisStreams
+
+' Relations Infrastructure
+EventPublisher --> PrometheusMetrics
+EventConsumer --> PrometheusMetrics
+SagaOrchestrator --> PrometheusMetrics
+SagaOrchestrator --> KongGateway
+
+note top of SagaOrchestrator : Coordination centralisée\ndes transactions distribuées\n(Synchrone)
+
+note top of EventStore : Persistance immuable\ndes événements\n(Event Sourcing)
+
+note top of RefundPaymentService : Coordination décentralisée\nvia événements\n(Asynchrone)
+
+note bottom of RedisStreams : Infrastructure de messagerie\npartagée entre les 3 labs
 
 @enduml

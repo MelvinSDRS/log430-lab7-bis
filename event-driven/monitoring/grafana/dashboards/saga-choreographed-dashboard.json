@@ -1,0 +1,264 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Saga Chorégraphiée - Remboursement",
+    "tags": ["saga", "choreographed", "refund"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Vue d'ensemble des Sagas",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(saga_events_processed_total[5m])",
+            "legendFormat": "{{event_type}} - {{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "displayMode": "list",
+              "orientation": "horizontal"
+            },
+            "mappings": [],
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 10
+                },
+                {
+                  "color": "red",
+                  "value": 20
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Remboursements Calculés",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "refunds_calculated_total",
+            "legendFormat": "Total Calculés"
+          },
+          {
+            "expr": "refunds_cancelled_total",
+            "legendFormat": "Total Annulés"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "displayMode": "list",
+              "orientation": "horizontal"
+            },
+            "mappings": [],
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Durée de Traitement des Remboursements",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(refund_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "95e percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(refund_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "50e percentile"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Temps (secondes)",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 4,
+        "title": "Ajustements de Stock",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "stock_adjustments_total",
+            "legendFormat": "Ajustements"
+          },
+          {
+            "expr": "stock_restorations_total",
+            "legendFormat": "Restaurations"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "displayMode": "list",
+              "orientation": "horizontal"
+            },
+            "mappings": [],
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 5,
+        "title": "Notifications Envoyées",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "notifications_sent_total",
+            "legendFormat": "{{notification_type}} - {{event_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "displayMode": "list",
+              "orientation": "horizontal"
+            },
+            "mappings": [],
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      },
+      {
+        "id": 6,
+        "title": "Flux de la Saga Chorégraphiée",
+        "type": "text",
+        "gridPos": {
+          "h": 6,
+          "w": 24,
+          "x": 0,
+          "y": 24
+        },
+        "options": {
+          "content": "## Flux de la Saga Chorégraphiée - Remboursement\n\n```\n1. Claims Service → SagaRemboursementDemarree\n2. Refund Payment Service → RemboursementCalcule\n3. Refund Inventory Service → StockMisAJour\n4. Notification Service → SagaRemboursementTerminee\n```\n\n### Événements de Compensation\n- **RemboursementAnnule** : En cas d'échec de paiement\n- **StockRestauree** : En cas d'échec d'inventaire\n- **SagaRemboursementEchouee** : Échec global de la saga",
+          "mode": "markdown"
+        }
+      },
+      {
+        "id": 7,
+        "title": "Événements par Type",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "increase(events_published_total[1m])",
+            "legendFormat": "{{event_type}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Événements/min",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 30
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": []
+    },
+    "refresh": "5s",
+    "schemaVersion": 27,
+    "version": 0,
+    "links": []
+  }
+}

@@ -1,188 +1,145 @@
-@startuml
-left to right direction
+@startuml cas_utilisation_etape3
+!define RECTANGLE class
 
-' Acteurs principaux
-actor "Client E-commerce" as CLIENT
-actor "Employé Magasin" as EMPLOYEE
-actor "Gestionnaire" as MANAGER
-actor "Application Mobile" as MOBILE
-actor "Système Externe" as EXTERNAL
+title Diagramme de Cas d'Utilisation - Étape 3
 
-rectangle "Système POS Microservices - Lab 5" {
-  
-  ' Product Service Use Cases
-  rectangle "Product Service" as PRODUCT_BC {
-    (Consulter catalogue) as UC_CATALOG
-    (Rechercher produits) as UC_SEARCH
-    (Gérer produits) as UC_MANAGE_PRODUCTS
-    (Gérer catégories) as UC_MANAGE_CATEGORIES
-  }
-  
-  ' Customer Service Use Cases  
-  rectangle "Customer Service" as CUSTOMER_BC {
-    (Créer compte client) as UC_REGISTER
-    (Authentifier client) as UC_LOGIN
-    (Gérer profil) as UC_PROFILE
-    (Gérer adresses) as UC_ADDRESSES
-  }
-  
-  ' Cart Service Use Cases
-  rectangle "Cart Service (Load Balanced)" as CART_BC {
-    (Ajouter au panier) as UC_ADD_CART
-    (Modifier panier) as UC_UPDATE_CART
-    (Vider panier) as UC_CLEAR_CART
-    (Calculer taxes) as UC_CALC_TAXES
-  }
-  
-  ' Order Service Use Cases
-  rectangle "Order Service" as ORDER_BC {
-    (Finaliser commande) as UC_CHECKOUT
-    (Suivre commande) as UC_TRACK_ORDER
-    (Gérer commandes) as UC_MANAGE_ORDERS
-    (Traiter paiement) as UC_PAYMENT
-  }
-  
-  ' Inventory Service Use Cases
-  rectangle "Inventory Service" as INVENTORY_BC {
-    (Consulter stocks) as UC_CHECK_STOCK
-    (Réserver stock) as UC_RESERVE_STOCK
-    (Gérer approvisionnement) as UC_REPLENISH
-    (Alertes stock) as UC_STOCK_ALERTS
-  }
-  
-  ' Sales Service Use Cases (POS)
-  rectangle "Sales Service" as SALES_BC {
-    (Traitement vente POS) as UC_POS_SALE
-    (Gestion retours) as UC_RETURNS
-    (Transactions magasin) as UC_STORE_TRANS
-    (Encaissement) as UC_CASHIER
-  }
-  
-  ' Reporting Service Use Cases
-  rectangle "Reporting Service" as REPORTING_BC {
-    (Rapports consolidés) as UC_REPORTS
-    (Tableau de bord) as UC_DASHBOARD
-    (Analytics ventes) as UC_ANALYTICS
-    (Métriques performance) as UC_METRICS
-  }
+' Acteurs
+:Client E-commerce: as ClientEcom
+:Employé Magasin: as Employee
+:Responsable Logistique: as LogManager
+:Gestionnaire Maison Mère: as HQManager
+:Agent Support Client: as SupportAgent
+:Auditeur Système: as Auditor
+:Orchestrateur Saga: as SagaOrch
+:DevOps Engineer: as DevOps
+
+rectangle "Lab 6 - Saga Orchestrée" {
+    usecase "Passer une commande e-commerce" as UC_OrderEcom
+    usecase "Valider le panier" as UC_ValidateCart
+    usecase "Réserver le stock" as UC_ReserveStock
+    usecase "Traiter le paiement" as UC_ProcessPayment
+    usecase "Confirmer la commande" as UC_ConfirmOrder
+    usecase "Compenser en cas d'échec" as UC_Compensate
+    usecase "Surveiller les sagas" as UC_MonitorSaga
+    usecase "Gérer les timeouts" as UC_HandleTimeout
+    usecase "Réessayer les étapes échouées" as UC_RetrySteps
 }
 
-' Kong API Gateway
-rectangle "Kong API Gateway" as GATEWAY {
-  (Authentification API) as UC_API_AUTH
-  (Rate Limiting) as UC_RATE_LIMIT
-  (Load Balancing) as UC_LOAD_BALANCE
-  (Routage services) as UC_ROUTING
-  }
-  
-' Relations Client E-commerce
-CLIENT --> UC_CATALOG
-CLIENT --> UC_SEARCH
-CLIENT --> UC_REGISTER
-CLIENT --> UC_LOGIN
-CLIENT --> UC_PROFILE
-CLIENT --> UC_ADD_CART
-CLIENT --> UC_UPDATE_CART
-CLIENT --> UC_CHECKOUT
-CLIENT --> UC_TRACK_ORDER
+rectangle "Lab 7 - Architecture Événementielle" {
+    usecase "Créer une réclamation" as UC_CreateClaim
+    usecase "Affecter une réclamation" as UC_AssignClaim
+    usecase "Traiter une réclamation" as UC_ProcessClaim
+    usecase "Résoudre une réclamation" as UC_ResolveClaim
+    usecase "Clôturer une réclamation" as UC_CloseClaim
+    usecase "Consulter l'historique des réclamations" as UC_ViewClaimHistory
+    usecase "Rechercher des réclamations" as UC_SearchClaims
+    usecase "Générer des rapports de réclamations" as UC_GenerateClaimReports
+    usecase "Envoyer des notifications automatiques" as UC_SendNotifications
+    usecase "Auditer les événements" as UC_AuditEvents
+    usecase "Rejouer les événements" as UC_ReplayEvents
+    usecase "Créer des projections CQRS" as UC_CreateProjections
+}
 
-' Relations Employé Magasin
-EMPLOYEE --> UC_POS_SALE
-EMPLOYEE --> UC_RETURNS
-EMPLOYEE --> UC_CASHIER
-EMPLOYEE --> UC_CHECK_STOCK
-EMPLOYEE --> UC_SEARCH
+rectangle "Lab 7 bis - Saga Chorégraphiée" {
+    usecase "Initier un remboursement" as UC_InitiateRefund
+    usecase "Calculer le montant du remboursement" as UC_CalculateRefund
+    usecase "Ajuster le stock pour remboursement" as UC_AdjustRefundStock
+    usecase "Notifier le client du remboursement" as UC_NotifyRefund
+    usecase "Compenser le remboursement" as UC_CompensateRefund
+    usecase "Tracer les sagas chorégraphiées" as UC_TraceChoreoSaga
+}
 
-' Relations Gestionnaire
-MANAGER --> UC_MANAGE_PRODUCTS
-MANAGER --> UC_MANAGE_CATEGORIES
-MANAGER --> UC_REPORTS
-MANAGER --> UC_DASHBOARD
-MANAGER --> UC_ANALYTICS
-MANAGER --> UC_REPLENISH
-MANAGER --> UC_MANAGE_ORDERS
+rectangle "Monitoring et Observabilité" {
+    usecase "Consulter les métriques Prometheus" as UC_ViewMetrics
+    usecase "Analyser les dashboards Grafana" as UC_AnalyzeDashboards
+    usecase "Surveiller la santé des services" as UC_MonitorHealth
+    usecase "Détecter les anomalies" as UC_DetectAnomalies
+    usecase "Générer des alertes" as UC_GenerateAlerts
+}
 
-' Relations Application Mobile
-MOBILE --> UC_CATALOG
-MOBILE --> UC_SEARCH
-MOBILE --> UC_ADD_CART
-MOBILE --> UC_CHECKOUT
-MOBILE --> UC_TRACK_ORDER
-MOBILE --> UC_LOGIN
+rectangle "Intégration Inter-Architectures" {
+    usecase "Enrichir les réclamations avec données commande" as UC_EnrichClaims
+    usecase "Gérer le mode dégradé" as UC_HandleDegradedMode
+    usecase "Synchroniser les données cross-lab" as UC_SyncCrossLab
+}
 
-' Relations Système Externe
-EXTERNAL --> UC_MANAGE_PRODUCTS
-EXTERNAL --> UC_REPORTS
-EXTERNAL --> UC_CHECK_STOCK
-EXTERNAL --> UC_ANALYTICS
+' Relations Lab 6 - Saga Orchestrée
+ClientEcom --> UC_OrderEcom
+UC_OrderEcom ..> UC_ValidateCart : <<includes>>
+UC_OrderEcom ..> UC_ReserveStock : <<includes>>
+UC_OrderEcom ..> UC_ProcessPayment : <<includes>>
+UC_OrderEcom ..> UC_ConfirmOrder : <<includes>>
+UC_OrderEcom ..> UC_Compensate : <<extends>>
 
-' Toutes les interactions passent par Kong Gateway
-CLIENT --> GATEWAY
-EMPLOYEE --> GATEWAY
-MANAGER --> GATEWAY
-MOBILE --> GATEWAY
-EXTERNAL --> GATEWAY
+SagaOrch --> UC_MonitorSaga
+SagaOrch --> UC_HandleTimeout
+SagaOrch --> UC_RetrySteps
+SagaOrch --> UC_Compensate
 
-' Gateway route vers les services
-GATEWAY --> PRODUCT_BC
-GATEWAY --> CUSTOMER_BC
-GATEWAY --> CART_BC
-GATEWAY --> ORDER_BC
-GATEWAY --> INVENTORY_BC
-GATEWAY --> SALES_BC
-GATEWAY --> REPORTING_BC
+' Relations Lab 7 - Architecture Événementielle
+ClientEcom --> UC_CreateClaim
+SupportAgent --> UC_AssignClaim
+SupportAgent --> UC_ProcessClaim
+SupportAgent --> UC_ResolveClaim
+SupportAgent --> UC_CloseClaim
 
-' Relations internes entre services (via Kong)
-UC_CHECKOUT ..> UC_ADD_CART : "validate cart"
-UC_CHECKOUT ..> UC_RESERVE_STOCK : "stock validation"
-UC_CHECKOUT ..> UC_LOGIN : "customer auth"
-UC_POS_SALE ..> UC_CHECK_STOCK : "stock validation"
-UC_POS_SALE ..> UC_CATALOG : "product lookup"
-UC_REPORTS ..> UC_STORE_TRANS : "sales data"
-UC_REPORTS ..> UC_CHECK_STOCK : "inventory data"
+HQManager --> UC_ViewClaimHistory
+HQManager --> UC_SearchClaims
+HQManager --> UC_GenerateClaimReports
 
-note top of GATEWAY
-  Kong API Gateway :8080
-  - Point d'entrée unique
-  - API Key & JWT Authentication
-  - Rate Limiting (100/min)
-  - CORS & Security
-  - Load Balancing (Cart Service)
-  - Health Checks & Monitoring
-end note
+UC_CreateClaim ..> UC_SendNotifications : <<includes>>
+UC_AssignClaim ..> UC_SendNotifications : <<includes>>
+UC_ResolveClaim ..> UC_SendNotifications : <<includes>>
 
-note right of CART_BC
-  Load Balanced Service:
-  - 3 instances actives
-  - Redis shared state
-  - Session persistence
-  - Automatic failover
-end note
+Auditor --> UC_AuditEvents
+Auditor --> UC_ReplayEvents
+DevOps --> UC_CreateProjections
 
-note right of PRODUCT_BC
-  Microservices Architecture:
-  - Database per Service
-  - Domain boundaries respect
-  - Event-driven communication
-  - Service autonomy
-  - API-first design
-end note
+' Relations Lab 7 bis - Saga Chorégraphiée
+SupportAgent --> UC_InitiateRefund
+UC_InitiateRefund ..> UC_CalculateRefund : <<includes>>
+UC_InitiateRefund ..> UC_AdjustRefundStock : <<includes>>
+UC_InitiateRefund ..> UC_NotifyRefund : <<includes>>
+UC_InitiateRefund ..> UC_CompensateRefund : <<extends>>
 
-note bottom of CLIENT
-  Use Cases E-commerce:
-  - Navigation produits
-  - Gestion panier
-  - Checkout sécurisé
-  - Suivi commandes
-  - Compte client
-end note
+DevOps --> UC_TraceChoreoSaga
 
-note bottom of EMPLOYEE
-  Use Cases POS:
-  - Ventes traditionnelles
-  - Encaissement physique
-  - Gestion retours
-  - Consultation stocks
-end note
+' Relations Monitoring
+DevOps --> UC_ViewMetrics
+DevOps --> UC_AnalyzeDashboards
+DevOps --> UC_MonitorHealth
+DevOps --> UC_DetectAnomalies
+DevOps --> UC_GenerateAlerts
+
+HQManager --> UC_ViewMetrics
+HQManager --> UC_AnalyzeDashboards
+
+' Relations Intégration
+DevOps --> UC_EnrichClaims
+DevOps --> UC_HandleDegradedMode
+DevOps --> UC_SyncCrossLab
+
+' Extensions spécifiques Lab 6
+UC_ValidateCart ..> UC_Compensate : <<extends>>
+UC_ReserveStock ..> UC_Compensate : <<extends>>
+UC_ProcessPayment ..> UC_Compensate : <<extends>>
+
+' Extensions spécifiques Lab 7 bis
+UC_CalculateRefund ..> UC_CompensateRefund : <<extends>>
+UC_AdjustRefundStock ..> UC_CompensateRefund : <<extends>>
+
+' Relations transversales
+UC_OrderEcom ..> UC_CreateClaim : <<extends>>
+UC_ResolveClaim ..> UC_InitiateRefund : <<extends>>
+
+note top of UC_OrderEcom : Transaction distribuée\navec compensation automatique\n(Saga Orchestrée)
+
+note top of UC_CreateClaim : Architecture événementielle\navec Event Sourcing\net projections CQRS
+
+note top of UC_InitiateRefund : Saga chorégraphiée\ndécentralisée\nsans orchestrateur central
+
+note bottom of UC_EnrichClaims : Intégration entre\nLab 6 et Lab 7\navec mode dégradé
+
+note right of UC_ViewMetrics : Observabilité distribuée\navec Prometheus/Grafana\npour les 3 labs
 
 @enduml

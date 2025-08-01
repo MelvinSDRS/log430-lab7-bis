@@ -4,16 +4,17 @@
 Système de point de vente (POS) **multi-magasins** évoluant vers des **architectures distribuées avancées** :
 - **Lab 6** : Architecture microservices avec orchestration saga pour transactions distribuées
 - **Lab 7** : Architecture événementielle avec Event Sourcing et CQRS pour gestion réclamations
+- **Lab 7 bis** : Saga chorégraphiée pour processus de remboursement décentralisé
 
 Le système gère **5 magasins + 1 centre logistique + 1 maison mère** avec patterns architecturaux pour systèmes distribués modernes.
 
 ## Evolution d'architecture
 
 ```
-Lab 3: API REST → Lab 4: Optimisations → Lab 5: Microservices → Lab 6: Saga → Lab 7: Event-Driven
-   ↓                    ↓                      ↓                     ↓            ↓
-Interface API        Load Balancer         7 Services isolés    9 Services    Architecture événementielle
-documentée          + Cache Redis         + Kong Gateway        + Saga        + Event Sourcing + CQRS
+Lab 3: API REST → Lab 4: Optimisations → Lab 5: Microservices → Lab 6: Saga → Lab 7: Event-Driven → Lab 7 bis: Saga Chorégraphiée
+   ↓                    ↓                      ↓                     ↓            ↓                          ↓
+Interface API        Load Balancer         7 Services isolés    9 Services    Architecture événementielle    Coordination décentralisée
+documentée          + Cache Redis         + Kong Gateway        + Saga        + Event Sourcing + CQRS        + Compensation distribuée
 ```
 
 ## Architecture microservices avec Saga
@@ -334,26 +335,59 @@ curl http://localhost:8101/health          # Claims Service
 curl http://localhost:8102/health          # Notification Service
 curl http://localhost:8103/health          # Audit Service
 
-# Test flux événementiel complet
+# Test flux événementiel complet (Lab 7)
 curl -X POST http://localhost:8101/claims \
   -H "Content-Type: application/json" \
   -d '{"customer_id": "customer_001", "claim_type": "product_defect", 
        "description": "Produit endommagé", "product_id": "product_123"}'
+
+# Test saga chorégraphiée Lab 7 bis
+./scripts/test-saga-choreographed.sh
 
 # Observabilité Lab 7
 http://localhost:3001                      # Grafana Dashboard Événementiel
 http://localhost:9091                      # Prometheus Métriques Lab 7
 ```
 
+### Lab 7 bis - Saga Chorégraphiée
+
+```bash
+# Tester la saga chorégraphiée (infrastructure partagée avec Lab 7)
+cd event-driven/
+./scripts/test-saga-choreographed.sh
+
+# Créer une réclamation et déclencher un remboursement
+curl -X POST http://localhost:8101/claims \
+  -H "Content-Type: application/json" \
+  -d '{"customer_id": "customer_001", "claim_type": "product_defect", 
+       "description": "Produit défectueux", "product_id": "product_123"}'
+
+# Services spécifiques Lab 7 bis
+curl http://localhost:8108/health              # Refund Payment Service
+curl http://localhost:8109/health              # Refund Inventory Service
+curl http://localhost:8108/metrics             # Métriques remboursements
+curl http://localhost:8109/metrics             # Métriques ajustements stock
+```
+
+**Comparaison Saga Orchestrée vs Chorégraphiée :**
+- **Lab 6 (Orchestrée)** : Coordination centralisée, visibilité complète
+- **Lab 7 bis (Chorégraphiée)** : Coordination distribuée, résilience accrue
+
 **Services Lab 7 :**
 - **Claims Service (8101)** : Producteur événements réclamations
-- **Notification Service (8102)** : Abonné notifications
+- **Notification Service (8102)** : Abonné notifications (partagé avec Lab 7 bis)
 - **Audit Service (8103)** : Abonné audit et conformité
 - **Integration Service (8107)** : Pont Lab 6 ↔ Lab 7
 
+**Services Lab 7 bis (Saga Chorégraphiée) :**
+- **Refund Payment Service (8108)** : Calcul remboursements
+- **Refund Inventory Service (8109)** : Ajustement stocks
+- **Claims Service (8101)** : Déclenchement saga (partagé)
+- **Notification Service (8102)** : Notifications distribuées (partagé)
+
 **Infrastructure :**
-- **Redis Streams (6381)** : Pub/Sub événementiel
-- **MongoDB (27018)** : Event Store persistence
+- **Redis Streams (6381)** : Pub/Sub événementiel (partagé Lab 7/7 bis)
+- **MongoDB (27018)** : Event Store persistence (partagé Lab 7/7 bis)
 - **PostgreSQL (5439)** : Read Models CQRS
 
 ## Tests et validation saga orchestration
@@ -477,19 +511,21 @@ curl http://localhost:8001/upstreams       # Load balancing status
 │   ├── monitoring/                   # Prometheus/Grafana avec métriques saga
 │   ├── scripts/                      # Scripts saga et tests de compensation
 │   └── docker-compose.yml            # Orchestration 9 microservices
-├── event-driven/                     # Lab 7 - Architecture événementielle
+├── event-driven/                     # Lab 7 + Lab 7 bis - Architecture événementielle
 │   ├── claims-service/               # Service gestion réclamations (producteur)
-│   ├── notification-service/         # Service notifications (abonné)
+│   ├── notification-service/         # Service notifications (partagé Lab 7/7 bis)
 │   ├── audit-service/                # Service audit et conformité (abonné)
 │   ├── projection-service/           # Service projections CQRS (abonné)
 │   ├── query-service/                # Service requêtes optimisées (CQRS)
 │   ├── event-store-service/          # Service Event Store (replay)
 │   ├── integration-service/          # Service pont Lab 6 ↔ Lab 7
+│   ├── refund-payment-service/       # Service remboursements (Lab 7 bis)
+│   ├── refund-inventory-service/     # Service ajustements stock (Lab 7 bis)
 │   ├── monitoring/                   # Prometheus/Grafana événementiel
 │   │   ├── grafana/                  # Dashboards Lab 7
 │   │   └── prometheus/               # Configuration métriques
 │   ├── scripts/                      # Scripts tests événementiel
-│   └── docker-compose.yml            # Orchestration Event Sourcing + CQRS
+│   └── docker-compose.yml            # Orchestration Event Sourcing + CQRS + Saga Chorégraphiée
 ├── docs/                             # Documentation et diagrammes UML
 │   ├── uml/                          # Diagrammes architectures (saga + CQRS)
 │   │   ├── images/                   # Images générées des diagrammes
@@ -500,6 +536,5 @@ curl http://localhost:8001/upstreams       # Load balancing status
 │       ├── 011-redis-streams-messaging.md
 │       └── 012-integration-inter-architectures.md
 ├── load_tests/k6/                    # Tests de performance et load balancing
-├── src/                              # Code legacy monolithique (conservé)
-└── RAPPORT_LAB7.md                   # Rapport architecture événementielle
+└── src/                              # Code legacy monolithique (conservé)
 ```
